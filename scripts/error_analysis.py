@@ -42,7 +42,12 @@ def load_runs(results_dir: Path) -> dict[str, dict]:
             LOGGER.warning("no predictions for %s", payload["system"])
             continue
         payload["predictions"] = read_json(predictions_path)
-        runs[payload["system"]] = payload
+        payload["seed"] = payload["config"].get("seed")
+        system = payload["system"]
+        # With several seeds per system, analyse the lowest-seed run so the
+        # contrastive examples come from one consistent set of models.
+        if system not in runs or (payload["seed"] or 0) < (runs[system]["seed"] or 0):
+            runs[system] = payload
     return runs
 
 
