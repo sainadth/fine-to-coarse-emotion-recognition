@@ -113,6 +113,34 @@ A two-minute end-to-end check that touches every code path:
 python scripts/train_stage2.py --config configs/smoke.yaml
 ```
 
+## 5b. Run it on Kaggle's free GPUs
+
+Kaggle is the only free GPU host with a real API, so runs can be launched from a terminal.
+The repository source is uploaded as a **private** Kaggle dataset and a **private** notebook
+kernel mounts it; nothing is published.
+
+One-time setup: grab an API token at <https://www.kaggle.com/settings> > API >
+*Create New Token*, then
+
+```bash
+mkdir -p ~/.kaggle && mv ~/Downloads/kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json
+pip install kaggle
+```
+
+Internet-enabled kernels need a phone-verified Kaggle account (Settings > Phone Verification) --
+without it the kernel cannot reach the Hugging Face Hub or the MELD CSVs.
+
+```bash
+python scripts/kaggle_run.py push              # upload/refresh the private source dataset
+python scripts/kaggle_run.py submit --wait     # start the GPU run, block, then pull results
+python scripts/kaggle_run.py status            # or poll it yourself
+python scripts/kaggle_run.py pull              # copy metrics + tables back into the repo
+```
+
+Free tier: 30 GPU-hours per week, 12 hours per session -- enough for Stage I plus M1-M4 in one
+kernel. Edit `STAGES` in `kaggle/run_pipeline.ipynb` to run a subset, or set `KEEP_CHECKPOINTS`
+there to keep the Stage-I backbone in the kernel output.
+
 ## 6. Results and analysis
 
 ```bash

@@ -23,3 +23,8 @@ docs/*.out
 docs/*.bbl
 docs/*.blg
 docs/*.synctex.gz
+
+# kaggle
+.kaggle_staging/
+kaggle_output/
+kaggle/kernel-metadata.json
