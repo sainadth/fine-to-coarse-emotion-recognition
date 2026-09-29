@@ -120,12 +120,15 @@ The repository source is uploaded as a **private** Kaggle dataset and a **privat
 kernel mounts it; nothing is published.
 
 One-time setup: grab an API token at <https://www.kaggle.com/settings> > API >
-*Create New Token*, then
+*Create New Token*. The downloaded `kaggle.json` holds a username and a key; put both in
+`.env` at the repository root (`.env` is git-ignored):
 
 ```bash
-mkdir -p ~/.kaggle && mv ~/Downloads/kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json
+cp .env.example .env    # then fill in KAGGLE_USERNAME and KAGGLE_KEY
 pip install kaggle
 ```
+
+`~/.kaggle/kaggle.json` is still picked up if you prefer keeping the token there.
 
 Internet-enabled kernels need a phone-verified Kaggle account (Settings > Phone Verification) --
 without it the kernel cannot reach the Hugging Face Hub or the MELD CSVs.

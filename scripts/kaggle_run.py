@@ -13,14 +13,17 @@ output. Nothing is made public.
 `push` and `submit` together are the usual start; `submit --wait` blocks until the
 kernel finishes and then pulls the output.
 
-Requires a Kaggle API token at ~/.kaggle/kaggle.json (Kaggle > Settings > API >
-Create New Token) and, for internet-enabled kernels, a phone-verified account.
+Credentials come from `.env` at the repository root (KAGGLE_USERNAME / KAGGLE_KEY),
+or from ~/.kaggle/kaggle.json if that is what you already have. Both are read from
+the Kaggle API token at Kaggle > Settings > API > Create New Token. Internet-enabled
+kernels additionally need a phone-verified account.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -40,9 +43,22 @@ KERNEL_SLUG = "fine-to-coarse-emotion-recognition"
 KERNEL_TITLE = "Fine-to-Coarse Sequential Emotion Recognition"
 SOURCE_DIRS = ("src", "scripts", "configs")
 TOKEN_PATH = Path.home() / ".kaggle" / "kaggle.json"
+ENV_PATH = REPO_ROOT / ".env"
 STAGING = REPO_ROOT / ".kaggle_staging"
 KERNEL_DIR = REPO_ROOT / "kaggle"
 TERMINAL_STATES = {"complete", "error", "cancelAcknowledged", "cancelRequested"}
+
+
+def load_env(path: Path = ENV_PATH) -> None:
+    """Read KEY=VALUE lines from .env without overriding the real environment."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
 def kaggle(*args: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
@@ -53,15 +69,27 @@ def kaggle(*args: str, check: bool = True, capture: bool = False) -> subprocess.
 
 
 def username() -> str:
-    if not TOKEN_PATH.exists():
-        raise SystemExit(
-            f"{TOKEN_PATH} not found.\n"
-            "Get it at https://www.kaggle.com/settings > API > Create New Token, then:\n"
-            "  mkdir -p ~/.kaggle && mv ~/Downloads/kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json"
-        )
-    if TOKEN_PATH.stat().st_mode & 0o077:
-        TOKEN_PATH.chmod(0o600)
-    return json.loads(TOKEN_PATH.read_text())["username"]
+    """Kaggle username, from .env (KAGGLE_USERNAME/KAGGLE_KEY) or ~/.kaggle/kaggle.json."""
+    load_env()
+    user = os.environ.get("KAGGLE_USERNAME", "").strip()
+    key = os.environ.get("KAGGLE_KEY", "").strip()
+    if user and key:
+        return user
+
+    if TOKEN_PATH.exists():
+        if TOKEN_PATH.stat().st_mode & 0o077:
+            TOKEN_PATH.chmod(0o600)
+        token = json.loads(TOKEN_PATH.read_text())
+        os.environ.setdefault("KAGGLE_USERNAME", token["username"])
+        os.environ.setdefault("KAGGLE_KEY", token["key"])
+        return token["username"]
+
+    raise SystemExit(
+        "No Kaggle credentials found.\n"
+        f"Fill in {ENV_PATH} (copy .env.example) with the values from your token:\n"
+        "  KAGGLE_USERNAME=...\n  KAGGLE_KEY=...\n"
+        "Get the token at https://www.kaggle.com/settings > API > Create New Token."
+    )
 
 
 def stage_source() -> Path:
