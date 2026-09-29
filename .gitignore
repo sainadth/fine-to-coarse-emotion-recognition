@@ -28,3 +28,6 @@ docs/*.synctex.gz
 .kaggle_staging/
 kaggle_output/
 kaggle/kernel-metadata.json
+
+# latex build products
+docs/report.pdf

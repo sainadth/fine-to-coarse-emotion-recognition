@@ -171,7 +171,8 @@ off by default so the four systems stay comparable.
 | Per-run test predictions | `results/<run_name>/test_predictions.json` |
 | Comparison tables | `docs/tables/table1.md`, `docs/tables/table1.tex` |
 | Error analysis | `docs/tables/error_analysis.json` |
-| Report | `docs/report.tex` |
+| Report source | `docs/report.tex`, `docs/report.bib` |
+| Report PDF | `docs/report.pdf` (build: `cd docs && tectonic report.tex`) |
 
 ## 8. Tests
 
