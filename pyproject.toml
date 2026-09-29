@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fine2coarse"
+version = "0.1.0"
+description = "Fine-to-coarse sequential emotion recognition: RoBERTa on GoEmotions transferred to MELD with an utterance-level Transformer encoder"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1.0",
+    "transformers>=4.38.0",
+    "datasets>=2.16.0",
+    "huggingface-hub>=0.20.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.4.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4.0"]
+plots = ["matplotlib>=3.8", "seaborn>=0.13"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

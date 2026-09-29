@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.DS_Store
+.env
+
+# data and artifacts
+data/**
+!data/.gitkeep
+checkpoints/
+results/**
+!results/.gitkeep
+runs/
+wandb/
+
+# latex build products
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.bbl
+docs/*.blg
+docs/*.synctex.gz

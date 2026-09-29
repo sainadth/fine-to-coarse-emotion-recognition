@@ -1,0 +1,21 @@
+# M1: RoBERTa-base -> MELD (no GoEmotions transfer, no UTE)
+run_name: M1_base_noute
+system: M1
+base_model: roberta-base
+from_stage1: null
+use_ute: false
+view: utterance
+seed: 42
+epochs: 5
+batch_size: 32
+eval_batch_size: 64
+learning_rate: 1.0e-5
+head_learning_rate: 1.0e-4
+weight_decay: 0.01
+warmup_ratio: 0.1
+max_length: 64
+max_turns: 24
+dropout: 0.1
+device: auto
+num_workers: 2
+amp: true

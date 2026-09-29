@@ -1,0 +1,19 @@
+# Tiny local smoke run: verifies the full Stage-II path in a couple of minutes.
+run_name: smoke_run
+system: SMOKE
+base_model: roberta-base
+from_stage1: null
+use_ute: true
+view: dialogue
+seed: 0
+epochs: 1
+batch_size: 2
+eval_batch_size: 2
+learning_rate: 1.0e-5
+head_learning_rate: 1.0e-4
+max_length: 32
+max_turns: 8
+limit: 8
+device: auto
+num_workers: 0
+amp: false
