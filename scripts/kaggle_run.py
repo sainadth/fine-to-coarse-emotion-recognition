@@ -40,8 +40,8 @@ LOGGER = get_logger()
 
 DATASET_SLUG = "f2c-src"
 DATASET_TITLE = "Fine-to-Coarse Emotion Recognition source"
-KERNEL_SLUG = "fine-to-coarse-sequential-emotion-recognition"  # Kaggle derives the slug from the title
-KERNEL_TITLE = "Fine-to-Coarse Sequential Emotion Recognition"
+KERNEL_SLUG = "f2c-pipeline"
+KERNEL_TITLE = "f2c pipeline"  # Kaggle derives the kernel slug from this title
 SOURCE_DIRS = ("src", "scripts", "configs")
 TOKEN_PATH = Path.home() / ".kaggle" / "kaggle.json"
 ENV_PATH = REPO_ROOT / ".env"
@@ -158,7 +158,12 @@ def cmd_push(args: argparse.Namespace) -> None:
 def cmd_submit(args: argparse.Namespace) -> None:
     user = username()
     write_kernel_metadata(user, enable_gpu=not args.cpu)
-    kaggle("kernels", "push", "-p", str(KERNEL_DIR))
+    push = ["kernels", "push", "-p", str(KERNEL_DIR)]
+    if not args.cpu:
+        # enable_gpu in the metadata is not enough on the current Kaggle images:
+        # the accelerator has to be named explicitly or the session comes up CPU-only.
+        push += ["--accelerator", args.accelerator]
+    kaggle(*push)
     LOGGER.info("kernel queued: https://www.kaggle.com/code/%s/%s", user, KERNEL_SLUG)
     if args.wait:
         wait_for_completion(user, args.poll)
@@ -235,6 +240,8 @@ def main() -> None:
     submit.add_argument("--wait", action="store_true", help="block until the kernel finishes, then pull")
     submit.add_argument("--poll", type=int, default=300, help="seconds between status checks")
     submit.add_argument("--cpu", action="store_true", help="run without a GPU (debugging only)")
+    submit.add_argument("--accelerator", default="nvidiaTeslaT4",
+                        help="Kaggle accelerator name, e.g. nvidiaTeslaT4, nvidiaTeslaP100, nvidiaL4x4")
     submit.add_argument("--out", default="kaggle_output")
     submit.set_defaults(func=cmd_submit)
 
