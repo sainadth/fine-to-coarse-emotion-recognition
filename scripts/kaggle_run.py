@@ -13,10 +13,11 @@ output. Nothing is made public.
 `push` and `submit` together are the usual start; `submit --wait` blocks until the
 kernel finishes and then pulls the output.
 
-Credentials come from `.env` at the repository root (KAGGLE_USERNAME / KAGGLE_KEY),
-or from ~/.kaggle/kaggle.json if that is what you already have. Both are read from
-the Kaggle API token at Kaggle > Settings > API > Create New Token. Internet-enabled
-kernels additionally need a phone-verified account.
+Credentials come from `.env` at the repository root. Kaggle now issues a single
+opaque token (it starts with `KGA`), which the CLI reads from KAGGLE_API_TOKEN;
+older accounts have a username/key pair in ~/.kaggle/kaggle.json instead. Both
+work here -- set KAGGLE_USERNAME plus either KAGGLE_API_TOKEN or KAGGLE_KEY.
+Internet-enabled kernels additionally need a phone-verified account.
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ LOGGER = get_logger()
 
 DATASET_SLUG = "f2c-src"
 DATASET_TITLE = "Fine-to-Coarse Emotion Recognition source"
-KERNEL_SLUG = "fine-to-coarse-emotion-recognition"
+KERNEL_SLUG = "fine-to-coarse-sequential-emotion-recognition"  # Kaggle derives the slug from the title
 KERNEL_TITLE = "Fine-to-Coarse Sequential Emotion Recognition"
 SOURCE_DIRS = ("src", "scripts", "configs")
 TOKEN_PATH = Path.home() / ".kaggle" / "kaggle.json"
@@ -69,25 +70,33 @@ def kaggle(*args: str, check: bool = True, capture: bool = False) -> subprocess.
 
 
 def username() -> str:
-    """Kaggle username, from .env (KAGGLE_USERNAME/KAGGLE_KEY) or ~/.kaggle/kaggle.json."""
+    """Kaggle username, from .env or ~/.kaggle/kaggle.json, after wiring up the token."""
     load_env()
     user = os.environ.get("KAGGLE_USERNAME", "").strip()
     key = os.environ.get("KAGGLE_KEY", "").strip()
-    if user and key:
+    token = os.environ.get("KAGGLE_API_TOKEN", "").strip()
+
+    # Newer Kaggle tokens are a single opaque string starting with "KGA"; the CLI
+    # expects those in KAGGLE_API_TOKEN, not in the legacy username/key pair.
+    if not token and key.startswith("KG"):
+        token = key
+        os.environ["KAGGLE_API_TOKEN"] = token
+        os.environ.pop("KAGGLE_KEY", None)
+    if user and (token or key):
         return user
 
     if TOKEN_PATH.exists():
         if TOKEN_PATH.stat().st_mode & 0o077:
             TOKEN_PATH.chmod(0o600)
-        token = json.loads(TOKEN_PATH.read_text())
-        os.environ.setdefault("KAGGLE_USERNAME", token["username"])
-        os.environ.setdefault("KAGGLE_KEY", token["key"])
-        return token["username"]
+        stored = json.loads(TOKEN_PATH.read_text())
+        os.environ.setdefault("KAGGLE_USERNAME", stored["username"])
+        os.environ.setdefault("KAGGLE_KEY", stored["key"])
+        return stored["username"]
 
     raise SystemExit(
         "No Kaggle credentials found.\n"
-        f"Fill in {ENV_PATH} (copy .env.example) with the values from your token:\n"
-        "  KAGGLE_USERNAME=...\n  KAGGLE_KEY=...\n"
+        f"Fill in {ENV_PATH} (copy .env.example):\n"
+        "  KAGGLE_USERNAME=...\n  KAGGLE_API_TOKEN=KGA...   # or KAGGLE_KEY for a legacy token\n"
         "Get the token at https://www.kaggle.com/settings > API > Create New Token."
     )
 
