@@ -1,0 +1,765 @@
+{
+  "systems": {
+    "M1": {
+      "test": {
+        "accuracy": 0.6532567049808429,
+        "macro_f1": 0.4518765845417234,
+        "weighted_f1": 0.6374144597146074
+      },
+      "per_class_f1": {
+        "anger": 0.46905537459283386,
+        "disgust": 0.1981981981981982,
+        "fear": 0.17391304347826086,
+        "joy": 0.6,
+        "neutral": 0.800749063670412,
+        "sadness": 0.3582089552238806,
+        "surprise": 0.563011456628478
+      },
+      "top_confusions": [
+        {
+          "true": "joy",
+          "pred": "neutral",
+          "count": 94
+        },
+        {
+          "true": "sadness",
+          "pred": "neutral",
+          "count": 86
+        },
+        {
+          "true": "anger",
+          "pred": "neutral",
+          "count": 82
+        },
+        {
+          "true": "neutral",
+          "pred": "joy",
+          "count": 60
+        },
+        {
+          "true": "anger",
+          "pred": "joy",
+          "count": 52
+        }
+      ]
+    },
+    "M2": {
+      "test": {
+        "accuracy": 0.6467432950191571,
+        "macro_f1": 0.4671421513418436,
+        "weighted_f1": 0.6361673612211726
+      },
+      "per_class_f1": {
+        "anger": 0.4603658536585366,
+        "disgust": 0.3238095238095238,
+        "fear": 0.15584415584415584,
+        "joy": 0.6065773447015834,
+        "neutral": 0.7911077041011882,
+        "sadness": 0.3793103448275862,
+        "surprise": 0.5529801324503312
+      },
+      "top_confusions": [
+        {
+          "true": "anger",
+          "pred": "neutral",
+          "count": 81
+        },
+        {
+          "true": "sadness",
+          "pred": "neutral",
+          "count": 80
+        },
+        {
+          "true": "neutral",
+          "pred": "joy",
+          "count": 79
+        },
+        {
+          "true": "joy",
+          "pred": "neutral",
+          "count": 77
+        },
+        {
+          "true": "anger",
+          "pred": "surprise",
+          "count": 47
+        }
+      ]
+    },
+    "M3": {
+      "test": {
+        "accuracy": 0.6402298850574712,
+        "macro_f1": 0.4637826723007947,
+        "weighted_f1": 0.6337103867873176
+      },
+      "per_class_f1": {
+        "anger": 0.4724137931034483,
+        "disgust": 0.24299065420560748,
+        "fear": 0.19148936170212766,
+        "joy": 0.6,
+        "neutral": 0.782264449722882,
+        "sadness": 0.381201044386423,
+        "surprise": 0.5761194029850746
+      },
+      "top_confusions": [
+        {
+          "true": "neutral",
+          "pred": "joy",
+          "count": 98
+        },
+        {
+          "true": "joy",
+          "pred": "neutral",
+          "count": 78
+        },
+        {
+          "true": "sadness",
+          "pred": "neutral",
+          "count": 73
+        },
+        {
+          "true": "neutral",
+          "pred": "surprise",
+          "count": 72
+        },
+        {
+          "true": "anger",
+          "pred": "neutral",
+          "count": 68
+        }
+      ]
+    },
+    "M4": {
+      "test": {
+        "accuracy": 0.6398467432950191,
+        "macro_f1": 0.4862896965360246,
+        "weighted_f1": 0.6359944512696233
+      },
+      "per_class_f1": {
+        "anger": 0.5014836795252225,
+        "disgust": 0.2882882882882883,
+        "fear": 0.30612244897959184,
+        "joy": 0.595,
+        "neutral": 0.7788726842727631,
+        "sadness": 0.3829787234042553,
+        "surprise": 0.5512820512820513
+      },
+      "top_confusions": [
+        {
+          "true": "joy",
+          "pred": "neutral",
+          "count": 85
+        },
+        {
+          "true": "neutral",
+          "pred": "joy",
+          "count": 82
+        },
+        {
+          "true": "sadness",
+          "pred": "neutral",
+          "count": 69
+        },
+        {
+          "true": "anger",
+          "pred": "neutral",
+          "count": 64
+        },
+        {
+          "true": "neutral",
+          "pred": "surprise",
+          "count": 62
+        }
+      ]
+    }
+  },
+  "deltas": {
+    "M1_to_M2_finegrained_transfer": {
+      "anger": -0.008689520934297257,
+      "disgust": 0.12561132561132562,
+      "fear": -0.018068887634105024,
+      "joy": 0.006577344701583443,
+      "neutral": -0.00964135956922374,
+      "sadness": 0.02110138960370561,
+      "surprise": -0.010031324178146783
+    },
+    "M1_to_M3_sequential_context": {
+      "anger": 0.0033584185106144138,
+      "disgust": 0.044792456007409276,
+      "fear": 0.017576318223866794,
+      "joy": 0.0,
+      "neutral": -0.018484613947529982,
+      "sadness": 0.022992089162542417,
+      "surprise": 0.013107946356596623
+    },
+    "M3_to_M4_transfer_with_context": {
+      "anger": 0.02906988642177427,
+      "disgust": 0.04529763408268081,
+      "fear": 0.11463308727746419,
+      "joy": -0.0050000000000000044,
+      "neutral": -0.0033917654501188776,
+      "sadness": 0.0017776790178323232,
+      "surprise": -0.024837351703023258
+    }
+  },
+  "examples": {
+    "context_helps_M4_over_M2": [
+      {
+        "dialogue_id": 2,
+        "turn": 5,
+        "speaker": "Ross",
+        "context": [
+          "Uhh, yes I did but there isn't. Okay, here we go.",
+          "Okay, go left. Left! Left!",
+          "Okay, y'know what? There is no more left, left!"
+        ],
+        "utterance": "Oh okay, lift it straight up over your head!",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M2_pred": "joy"
+      },
+      {
+        "dialogue_id": 4,
+        "turn": 1,
+        "speaker": "Monica",
+        "context": [
+          "Ohh!"
+        ],
+        "utterance": "What?",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M2_pred": "surprise"
+      },
+      {
+        "dialogue_id": 4,
+        "turn": 2,
+        "speaker": "Phoebe",
+        "context": [
+          "Ohh!",
+          "What?"
+        ],
+        "utterance": "It kicked! I think the baby kicked!",
+        "gold": "surprise",
+        "M4_pred": "surprise",
+        "M2_pred": "anger"
+      },
+      {
+        "dialogue_id": 7,
+        "turn": 7,
+        "speaker": "Ross",
+        "context": [
+          "So you can like, bite, and pull people's hair and stuff?",
+          "Yeah, anything goes, except ah, eye gouging and fish hooking.",
+          "What's fish hooking?"
+        ],
+        "utterance": "Huh, what's fish hooking...   Thanks man, that would have been really hard to describe. What is that taste?",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M2_pred": "joy"
+      },
+      {
+        "dialogue_id": 8,
+        "turn": 0,
+        "speaker": "Jade",
+        "context": [],
+        "utterance": "Oh, Bob, he was nothing compared to you. I had to bite my lip to keep from screaming your name.",
+        "gold": "sadness",
+        "M4_pred": "sadness",
+        "M2_pred": "disgust"
+      },
+      {
+        "dialogue_id": 8,
+        "turn": 3,
+        "speaker": "Ross",
+        "context": [
+          "Oh, Bob, he was nothing compared to you. I had to bite my lip to keep from screaming your name.",
+          "Well, that makes me feel so good.",
+          "It was just so awkward and bumpy."
+        ],
+        "utterance": "Bumpy?",
+        "gold": "surprise",
+        "M4_pred": "surprise",
+        "M2_pred": "neutral"
+      },
+      {
+        "dialogue_id": 11,
+        "turn": 1,
+        "speaker": "Rachel",
+        "context": [
+          "Well Phoebe, we gotta do something!"
+        ],
+        "utterance": "I mean there's no way Joey's gonna make it in time.",
+        "gold": "fear",
+        "M4_pred": "fear",
+        "M2_pred": "sadness"
+      },
+      {
+        "dialogue_id": 17,
+        "turn": 6,
+        "speaker": "Chandler",
+        "context": [
+          "Ewww! Oh! It's the Mattress King!",
+          "Don't look honey. Change the channel! Change the channel!",
+          "Wait! Wait! I wanna see this. After I divorce him, half of that kingdom is gonna be mine."
+        ],
+        "utterance": "What a wank!",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M2_pred": "joy"
+      },
+      {
+        "dialogue_id": 20,
+        "turn": 6,
+        "speaker": "Rachel",
+        "context": [
+          "See look,",
+          "Exactly! Unisex!",
+          "Maybe you need sex."
+        ],
+        "utterance": "No! No Joey! U-N-I-sex.",
+        "gold": "joy",
+        "M4_pred": "joy",
+        "M2_pred": "fear"
+      },
+      {
+        "dialogue_id": 22,
+        "turn": 20,
+        "speaker": "Monica",
+        "context": [
+          "Really? Okay. Great!",
+          "Ohh, welcome to an adult relationship!",
+          "We're in a relationship?"
+        ],
+        "utterance": "I'm afraid so.",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M2_pred": "fear"
+      },
+      {
+        "dialogue_id": 33,
+        "turn": 4,
+        "speaker": "Monica",
+        "context": [
+          "Go back in time and listen to Phoebe!",
+          "Alright here's something, it says to try holding the baby  close to your body and then swing her rapidly from side to side.",
+          "Ok."
+        ],
+        "utterance": "It worked!",
+        "gold": "surprise",
+        "M4_pred": "surprise",
+        "M2_pred": "joy"
+      },
+      {
+        "dialogue_id": 33,
+        "turn": 7,
+        "speaker": "Monica",
+        "context": [
+          "It worked!",
+          "Oh  oh no just stopped to throw up a little bit.",
+          "Oh come on, what am I gonna do, its been hours and it  won't stop crying."
+        ],
+        "utterance": "Umm, she Rach, not it, she.",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M2_pred": "fear"
+      },
+      {
+        "dialogue_id": 34,
+        "turn": 10,
+        "speaker": "Monica",
+        "context": [
+          "It's not like, I haven't any opportunities.",
+          "I mean, y'know, I'm just waiting for the perfect guy.",
+          "I'm seeing this guy Roger, all right?"
+        ],
+        "utterance": "He's not perfect, but umm, I think maybe I should just get it over with.",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M2_pred": "sadness"
+      },
+      {
+        "dialogue_id": 37,
+        "turn": 2,
+        "speaker": "Janice",
+        "context": [
+          "So, I hear, you hate me!",
+          "I, ah, I never said hate, I was very careful about that."
+        ],
+        "utterance": "A little birdie told me something about you wanting to rip your arm off and throw it at me.",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M2_pred": "neutral"
+      },
+      {
+        "dialogue_id": 37,
+        "turn": 7,
+        "speaker": "Janice",
+        "context": [
+          "All right, fine, fine, fine, fine, fine, we've got to do something about our little situation here Joey.",
+          "So, this is my idea: you and me spending some quality time together.",
+          "But what does that gonna do..."
+        ],
+        "utterance": "For Chandler!",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M2_pred": "joy"
+      }
+    ],
+    "context_hurts_M2_over_M4": [
+      {
+        "dialogue_id": 1,
+        "turn": 2,
+        "speaker": "Joey",
+        "context": [],
+        "utterance": "Push 'em out, push 'em out, harder, harder.",
+        "gold": "joy",
+        "M2_pred": "joy",
+        "M4_pred": "anger"
+      },
+      {
+        "dialogue_id": 5,
+        "turn": 0,
+        "speaker": "Chandler",
+        "context": [],
+        "utterance": "You're coming on to the entire room!  I'm Chandler.",
+        "gold": "anger",
+        "M2_pred": "anger",
+        "M4_pred": "surprise"
+      },
+      {
+        "dialogue_id": 5,
+        "turn": 7,
+        "speaker": "Chandler",
+        "context": [],
+        "utterance": "What a coincidence, I listen in my sleep.",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "surprise"
+      },
+      {
+        "dialogue_id": 10,
+        "turn": 2,
+        "speaker": "Joey",
+        "context": [],
+        "utterance": "I don't know if you'd understand.",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "sadness"
+      },
+      {
+        "dialogue_id": 13,
+        "turn": 2,
+        "speaker": "Roger",
+        "context": [],
+        "utterance": "Well, I'm not I'm not at all surprised they feel that way.",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "anger"
+      },
+      {
+        "dialogue_id": 13,
+        "turn": 3,
+        "speaker": "Phoebe",
+        "context": [],
+        "utterance": "You're not? See, that's why you're so great!",
+        "gold": "surprise",
+        "M2_pred": "surprise",
+        "M4_pred": "anger"
+      },
+      {
+        "dialogue_id": 15,
+        "turn": 0,
+        "speaker": "Phoebe",
+        "context": [],
+        "utterance": "Yeah! Sure! Yep!  Oh, y'know what? If I heard a shot right now, I'd throw my body on you.",
+        "gold": "joy",
+        "M2_pred": "joy",
+        "M4_pred": "anger"
+      },
+      {
+        "dialogue_id": 15,
+        "turn": 2,
+        "speaker": "Phoebe",
+        "context": [],
+        "utterance": "Okay!",
+        "gold": "joy",
+        "M2_pred": "joy",
+        "M4_pred": "anger"
+      },
+      {
+        "dialogue_id": 17,
+        "turn": 5,
+        "speaker": "Janice",
+        "context": [],
+        "utterance": "Wait! Wait! I wanna see this. After I divorce him, half of that kingdom is gonna be mine.",
+        "gold": "joy",
+        "M2_pred": "joy",
+        "M4_pred": "anger"
+      },
+      {
+        "dialogue_id": 25,
+        "turn": 8,
+        "speaker": "Ross",
+        "context": [],
+        "utterance": "Y'know what I didn't wear this suit for a year because you hated it. Well, guess what? You're not my girlfriend anymore so...",
+        "gold": "anger",
+        "M2_pred": "anger",
+        "M4_pred": "sadness"
+      },
+      {
+        "dialogue_id": 32,
+        "turn": 2,
+        "speaker": "Phoebe",
+        "context": [],
+        "utterance": "No-no, sorry. Cookies are good, thanks.",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "joy"
+      },
+      {
+        "dialogue_id": 32,
+        "turn": 4,
+        "speaker": "Phoebe",
+        "context": [],
+        "utterance": "Well, so, umm, anyway umm, I've been, I've been looking for my Father, and umm, have you heard from him, or seen him?",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "sadness"
+      },
+      {
+        "dialogue_id": 34,
+        "turn": 8,
+        "speaker": "Monica",
+        "context": [],
+        "utterance": "I mean, y'know, I'm just waiting for the perfect guy.",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "joy"
+      },
+      {
+        "dialogue_id": 43,
+        "turn": 1,
+        "speaker": "Joey",
+        "context": [],
+        "utterance": "Oh yeah, who's playing?",
+        "gold": "neutral",
+        "M2_pred": "neutral",
+        "M4_pred": "joy"
+      },
+      {
+        "dialogue_id": 45,
+        "turn": 0,
+        "speaker": "Monica",
+        "context": [],
+        "utterance": "Phoebe! Come on! Let's go!  Come on!  Why aren't you dressed yet?!",
+        "gold": "anger",
+        "M2_pred": "anger",
+        "M4_pred": "joy"
+      }
+    ],
+    "transfer_helps_M4_over_M3": [
+      {
+        "dialogue_id": 3,
+        "turn": 5,
+        "speaker": "Ross",
+        "context": [
+          "Howard's the",
+          "Yes but too me he's just, man.",
+          "Okay, fine, whatever. Welcome to the building."
+        ],
+        "utterance": "Ugh, can you believe that guy!",
+        "gold": "disgust",
+        "M4_pred": "disgust",
+        "M3_pred": "surprise"
+      },
+      {
+        "dialogue_id": 4,
+        "turn": 1,
+        "speaker": "Monica",
+        "context": [
+          "Ohh!"
+        ],
+        "utterance": "What?",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M3_pred": "surprise"
+      },
+      {
+        "dialogue_id": 4,
+        "turn": 6,
+        "speaker": "Monica",
+        "context": [
+          "Oh my God!",
+          "Oh no wait, oh no, the elastic on my underwear busted.",
+          "Oh my God! I overslept! I was supposed to be on the set a half an hour ago! I gotta get out of here!"
+        ],
+        "utterance": "Oh wait, Joey, you can't go like that! You stink!",
+        "gold": "disgust",
+        "M4_pred": "disgust",
+        "M3_pred": "anger"
+      },
+      {
+        "dialogue_id": 7,
+        "turn": 7,
+        "speaker": "Ross",
+        "context": [
+          "So you can like, bite, and pull people's hair and stuff?",
+          "Yeah, anything goes, except ah, eye gouging and fish hooking.",
+          "What's fish hooking?"
+        ],
+        "utterance": "Huh, what's fish hooking...   Thanks man, that would have been really hard to describe. What is that taste?",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M3_pred": "surprise"
+      },
+      {
+        "dialogue_id": 8,
+        "turn": 0,
+        "speaker": "Jade",
+        "context": [],
+        "utterance": "Oh, Bob, he was nothing compared to you. I had to bite my lip to keep from screaming your name.",
+        "gold": "sadness",
+        "M4_pred": "sadness",
+        "M3_pred": "joy"
+      },
+      {
+        "dialogue_id": 11,
+        "turn": 1,
+        "speaker": "Rachel",
+        "context": [
+          "Well Phoebe, we gotta do something!"
+        ],
+        "utterance": "I mean there's no way Joey's gonna make it in time.",
+        "gold": "fear",
+        "M4_pred": "fear",
+        "M3_pred": "sadness"
+      },
+      {
+        "dialogue_id": 12,
+        "turn": 10,
+        "speaker": "Chandler",
+        "context": [
+          "Do you really want to throw that all away over a room?",
+          "That is so silly.",
+          "Now wh-what is more important, love or silliness?"
+        ],
+        "utterance": "Well, we are fond of the silliness, but we also have a soft spot for the love.",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M3_pred": "joy"
+      },
+      {
+        "dialogue_id": 16,
+        "turn": 3,
+        "speaker": "A Waiter",
+        "context": [
+          "Hey, Joey, could you pass the cheese?",
+          "Listen uh, I'd prefer it if you didn't call me Joey.",
+          "Since I don't know anyone here, I thought it'd be cool to try out a cool work nickname."
+        ],
+        "utterance": "Hey, dragon! Here's your tips from Monday and Tuesday.",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M3_pred": "joy"
+      },
+      {
+        "dialogue_id": 17,
+        "turn": 6,
+        "speaker": "Chandler",
+        "context": [
+          "Ewww! Oh! It's the Mattress King!",
+          "Don't look honey. Change the channel! Change the channel!",
+          "Wait! Wait! I wanna see this. After I divorce him, half of that kingdom is gonna be mine."
+        ],
+        "utterance": "What a wank!",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M3_pred": "joy"
+      },
+      {
+        "dialogue_id": 20,
+        "turn": 6,
+        "speaker": "Rachel",
+        "context": [
+          "See look,",
+          "Exactly! Unisex!",
+          "Maybe you need sex."
+        ],
+        "utterance": "No! No Joey! U-N-I-sex.",
+        "gold": "joy",
+        "M4_pred": "joy",
+        "M3_pred": "disgust"
+      },
+      {
+        "dialogue_id": 22,
+        "turn": 10,
+        "speaker": "Monica",
+        "context": [
+          "Why, exactly?",
+          "Because of the weekend, we had a fight.",
+          "Chandler that's crazy!"
+        ],
+        "utterance": "If you give up every time you'd have a fight with someone you'd never be with anyone longer than\u2014Ohhh!",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M3_pred": "joy"
+      },
+      {
+        "dialogue_id": 22,
+        "turn": 20,
+        "speaker": "Monica",
+        "context": [
+          "Really? Okay. Great!",
+          "Ohh, welcome to an adult relationship!",
+          "We're in a relationship?"
+        ],
+        "utterance": "I'm afraid so.",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M3_pred": "fear"
+      },
+      {
+        "dialogue_id": 25,
+        "turn": 10,
+        "speaker": "Rachel",
+        "context": [
+          "Got a job on a river boat?",
+          "Y'know what I didn't wear this suit for a year because you hated it. Well, guess what? You're not my girlfriend anymore so...",
+          "Oh I see, so this suit is making a point."
+        ],
+        "utterance": "Now that you're on you're own, you're free to look as stupid as you like.",
+        "gold": "anger",
+        "M4_pred": "anger",
+        "M3_pred": "neutral"
+      },
+      {
+        "dialogue_id": 25,
+        "turn": 11,
+        "speaker": "Ross",
+        "context": [
+          "Y'know what I didn't wear this suit for a year because you hated it. Well, guess what? You're not my girlfriend anymore so...",
+          "Oh I see, so this suit is making a point.",
+          "Now that you're on you're own, you're free to look as stupid as you like."
+        ],
+        "utterance": "You like it right?",
+        "gold": "neutral",
+        "M4_pred": "neutral",
+        "M3_pred": "joy"
+      },
+      {
+        "dialogue_id": 29,
+        "turn": 11,
+        "speaker": "Ross",
+        "context": [
+          "There's a forest right outside.",
+          "It's not the same.",
+          "Ok, go quick!"
+        ],
+        "utterance": "Thank you for a delightful stay.",
+        "gold": "joy",
+        "M4_pred": "joy",
+        "M3_pred": "neutral"
+      }
+    ]
+  }
+}
