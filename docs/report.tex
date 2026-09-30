@@ -1,20 +1,65 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath,amssymb}
+%% ACM sigconf: two-column research report (nonacm). Build: tectonic report.tex
+\documentclass[sigconf,nonacm]{acmart}
+\usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{xurl}
+\usepackage{balance}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
-\usepackage[hidelinks]{hyperref}
-\usepackage{natbib}
 
-\title{Fine-to-Coarse Sequential Emotion Recognition with Hierarchical Transformer Models}
-\author{TEAM MEMBERS \\ COSC 6341, Computer Science Department, TAMUCC}
-\date{December 4, 2026}
+% Let long \texttt{} tokens and inline math break instead of bleeding across the column rule.
+\sloppy
+\emergencystretch=3em
+\hfuzz=2pt
+
+% Course submission: no permission footnote
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\settopmatter{printacmref=false,printfolios=true}
+
+% --- title & authors ---
+\title[Fine-to-Coarse Sequential Emotion Recognition]{Fine-to-Coarse Sequential Emotion Recognition with Hierarchical Transformer Models}
+
+\author{Sainadth Pagadala}
+\email{spagadala1@islander.tamucc.edu}
+\affiliation{%
+  \department{College of Engineering and Computer Science}
+  \institution{Texas A\&M University--Corpus Christi}
+  \city{Corpus Christi}
+  \state{TX}
+  \postcode{78412}
+  \country{USA}}
+\author{Minhua Huang}
+\authornote{Course instructor and project advisor.}
+\affiliation{%
+  \department{College of Engineering and Computer Science}
+  \institution{Texas A\&M University--Corpus Christi}
+  \city{Corpus Christi}
+  \state{TX}
+  \postcode{78412}
+  \country{USA}}
+\renewcommand{\shortauthors}{Pagadala and Huang}
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+  <concept_id>10010147.10010178.10010179</concept_id>
+  <concept_desc>Computing methodologies~Natural language processing</concept_desc>
+  <concept_significance>500</concept_significance>
+</concept>
+<concept>
+  <concept_id>10010147.10010257.10010293.10010294</concept_id>
+  <concept_desc>Computing methodologies~Neural networks</concept_desc>
+  <concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+\ccsdesc[500]{Computing methodologies~Natural language processing}
+\ccsdesc[300]{Computing methodologies~Neural networks}
+
+\keywords{emotion recognition in conversation, transfer learning, GoEmotions, MELD, RoBERTa, hierarchical Transformer}
 
 \begin{document}
-\maketitle
-
 \begin{abstract}
 We ask whether fine-grained emotion knowledge transfers to coarse-grained sequential
 emotion recognition in dialogue. A RoBERTa-base encoder is first fine-tuned on GoEmotions
@@ -32,6 +77,7 @@ the explicit fine-grained distribution into the UTE gives no additional macro-F1
 indicating that what transfers is the representation rather than the fine-grained
 predictions themselves.
 \end{abstract}
+\maketitle
 
 \section{Introduction and Motivation}
 Emotion recognition in conversation differs from sentence-level emotion classification in
@@ -194,9 +240,9 @@ used and no window spans two dialogues. Utterances are tokenised to at most 64 w
 
 \subsection{Systems}
 \begin{align*}
-M_1 &: \mathrm{RoBERTa}_{base} \rightarrow \mathrm{MELD}, &
-M_2 &: \mathrm{RoBERTa}_G \rightarrow \mathrm{MELD}, \\
-M_3 &: \mathrm{RoBERTa}_{base} + \mathrm{UTE} \rightarrow \mathrm{MELD}, &
+M_1 &: \mathrm{RoBERTa}_{base} \rightarrow \mathrm{MELD},\\
+M_2 &: \mathrm{RoBERTa}_G \rightarrow \mathrm{MELD},\\
+M_3 &: \mathrm{RoBERTa}_{base} + \mathrm{UTE} \rightarrow \mathrm{MELD},\\
 M_4 &: \mathrm{RoBERTa}_G + \mathrm{UTE} \rightarrow \mathrm{MELD}.
 \end{align*}
 
@@ -231,7 +277,7 @@ are of the same order as the spread across seeds, we also compute \emph{paired} 
 differences, in which each system is compared against another system trained with the same
 seed; this cancels the shared seed effect and is the more informative view.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \caption{Paired per-seed differences in MELD test macro-F1 (points). Each column is one
 seed; a comparison is meaningful only if its sign is stable across all three.}
@@ -248,7 +294,7 @@ $M_1 \rightarrow M_4$ & both                             & $+3.44$ & $+2.07$ & $
 $M_4 \rightarrow$ ext. & explicit $p^f_t$                & $-1.28$ & $+0.37$ & $+0.66$ & $-0.08$ \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \paragraph{$M_1$ vs $M_2$: fine-grained transfer.}
 Transferring the GoEmotions-trained backbone improves macro-F1 by $1.85$ points, positive
@@ -292,7 +338,7 @@ already score around $0.78$--$0.80$ F1, and every improvement reported here is b
 the rare classes.
 
 \section{Error Analysis}
-All examples below are drawn from \texttt{docs/tables/error\_analysis.json}, which is
+All examples below are drawn from \path{docs/tables/error_analysis.json}, which is
 generated from the saved test predictions.
 
 \paragraph{Where context changes the interpretation.}
@@ -379,7 +425,8 @@ label sets --- than concatenated at inference. Third, the dialogue-initial failu
 UTE suggest speaker-aware conditioning or a causal attention mask, both of which the current
 implementation supports behind flags but which were not evaluated here.
 
-\bibliographystyle{plainnat}
+\balance
+\bibliographystyle{ACM-Reference-Format}
 \bibliography{report}
 
 \end{document}

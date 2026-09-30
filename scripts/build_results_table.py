@@ -91,13 +91,13 @@ def latex_table(runs: dict[str, list[dict]]) -> str:
         + (f" Mean $\\pm$ standard deviation over {seeds} seeds." if seeds > 1 else "")
     )
     return (
-        "\\begin{table}[t]\n\\centering\n"
+        "\\begin{table*}[t]\n\\centering\n"
         f"\\caption{{{caption}}}\n"
         "\\label{tab:main}\n"
         "\\begin{tabular}{lccrccc}\n\\toprule\n"
         "Model & GoEmotions & UTE & Runs & Accuracy & Macro-F1 & Weighted-F1 \\\\\n\\midrule\n"
         + "\n".join(rows)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
     )
 
 
