@@ -9,6 +9,7 @@ those seeds. A single run per system prints plain numbers.
 from __future__ import annotations
 
 import argparse
+import re
 import statistics
 import sys
 from pathlib import Path
@@ -27,10 +28,23 @@ SYSTEM_LABEL = {
 METRICS = ("accuracy", "macro_f1", "weighted_f1")
 
 
-def collect(results_dir: Path) -> dict[str, list[dict]]:
-    """All Stage-II runs, grouped by system and ordered by seed."""
+def run_name_pattern(prefix: str = "") -> re.Pattern:
+    """Run directories that belong to one table: `<prefix>M<k>_s<seed>`.
+
+    Sweep runs (`sweep_*`) and other recipes (`v2_M4_s42`) share results/ with the
+    baseline, and they are recorded as the same system; without this filter they
+    would be averaged into the baseline cells.
+    """
+    return re.compile(rf"^{re.escape(prefix)}M\d+_s\d+$")
+
+
+def collect(results_dir: Path, prefix: str = "") -> dict[str, list[dict]]:
+    """Stage-II runs named `<prefix>M<k>_s<seed>`, grouped by system and ordered by seed."""
+    pattern = run_name_pattern(prefix)
     runs: dict[str, list[dict]] = {}
     for metrics_path in sorted(results_dir.glob("*/metrics.json")):
+        if not pattern.match(metrics_path.parent.name):
+            continue
         payload = read_json(metrics_path)
         if payload.get("stage") != "II":
             continue
@@ -139,9 +153,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", default=str(RESULTS_DIR))
     parser.add_argument("--out-dir", default="docs/tables")
+    parser.add_argument("--prefix", default="",
+                        help="only runs named <prefix>M<k>_s<seed>, e.g. v2_ for a new recipe")
     args = parser.parse_args()
 
-    runs = collect(Path(args.results_dir))
+    runs = collect(Path(args.results_dir), args.prefix)
     if not runs:
         raise SystemExit(f"no Stage-II metrics.json found under {args.results_dir}")
     LOGGER.info("systems: %s", ", ".join(f"{s}×{len(g)}" for s, g in sorted(runs.items())))

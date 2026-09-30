@@ -107,19 +107,32 @@ def load_meld_frame(split: str, data_dir: Path | None = None) -> pd.DataFrame:
     return frame
 
 
+def with_speaker(text: str, speaker: str, speaker_prefix: bool) -> str:
+    """Optionally prepend the *current* utterance's speaker ("Joey: Hey!").
+
+    This only uses metadata of the utterance itself, never neighbouring turns, so
+    it is valid for the independent-utterance systems M1/M2 as well.
+    """
+    return f"{speaker}: {text}" if speaker_prefix and speaker else text
+
+
 def load_meld_dialogues(
     split: str,
     max_turns: int = 24,
     data_dir: Path | None = None,
+    speaker_prefix: bool = False,
 ) -> list[Dialogue]:
     """Group a split into dialogues, preserving order and boundaries."""
     frame = load_meld_frame(split, data_dir=data_dir)
     dialogues: list[Dialogue] = []
     for dialogue_id, group in frame.groupby("Dialogue_ID", sort=True):
         group = group.sort_values("Utterance_ID")
-        utterances = group["Utterance"].tolist()
-        labels = group["label"].tolist()
         speakers = group["Speaker"].map(_clean).tolist()
+        utterances = [
+            with_speaker(text, speaker, speaker_prefix)
+            for text, speaker in zip(group["Utterance"].tolist(), speakers)
+        ]
+        labels = group["label"].tolist()
         turn_ids = group["Utterance_ID"].tolist()
         for start in range(0, len(utterances), max_turns):
             stop = start + max_turns
@@ -214,10 +227,13 @@ def build_meld_dialogue_dataloaders(
     num_workers: int = 0,
     limit: int | None = None,
     data_dir: Path | None = None,
+    speaker_prefix: bool = False,
 ) -> dict[str, DataLoader]:
     loaders: dict[str, DataLoader] = {}
     for split in SPLITS:
-        dialogues = load_meld_dialogues(split, max_turns=max_turns, data_dir=data_dir)
+        dialogues = load_meld_dialogues(
+            split, max_turns=max_turns, data_dir=data_dir, speaker_prefix=speaker_prefix
+        )
         if limit:
             dialogues = dialogues[:limit]
         dataset = DialogueDataset(dialogues, tokenizer, max_length=max_length)
@@ -231,6 +247,16 @@ def build_meld_dialogue_dataloaders(
     return loaders
 
 
+def meld_utterance_examples(
+    split: str, data_dir: Path | None = None, speaker_prefix: bool = False
+) -> list[TextExample]:
+    frame = load_meld_frame(split, data_dir=data_dir)
+    return [
+        TextExample(text=with_speaker(row.Utterance, _clean(row.Speaker), speaker_prefix), label=int(row.label))
+        for row in frame.itertuples()
+    ]
+
+
 def build_meld_utterance_dataloaders(
     tokenizer,
     batch_size: int = 32,
@@ -239,15 +265,12 @@ def build_meld_utterance_dataloaders(
     num_workers: int = 0,
     limit: int | None = None,
     data_dir: Path | None = None,
+    speaker_prefix: bool = False,
 ) -> dict[str, DataLoader]:
     """Independent-utterance view used by systems M1 and M2."""
     loaders: dict[str, DataLoader] = {}
     for split in SPLITS:
-        frame = load_meld_frame(split, data_dir=data_dir)
-        examples = [
-            TextExample(text=row.Utterance, label=int(row.label))
-            for row in frame.itertuples()
-        ]
+        examples = meld_utterance_examples(split, data_dir=data_dir, speaker_prefix=speaker_prefix)
         if limit:
             examples = examples[:limit]
         dataset = TextClassificationDataset(examples, tokenizer, max_length=max_length)

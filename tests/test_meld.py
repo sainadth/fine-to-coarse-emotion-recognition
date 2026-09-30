@@ -89,3 +89,24 @@ def test_collate_pads_turns_and_masks_labels(meld_dir):
     assert batch["labels"][1, 2:].tolist() == [-100, -100, -100]
     assert batch["speaker_ids"][0].tolist() == [1, 2, 1, 2, 1]
     assert (batch["attention_mask"][1, 2:] == 0).all()
+
+
+def test_speaker_prefix_is_off_by_default(meld_dir):
+    dialogues = load_meld_dialogues("train", max_turns=24, data_dir=meld_dir)
+    assert dialogues[0].utterances[0] == "Hey!"
+
+
+def test_speaker_prefix_names_only_the_current_speaker(meld_dir):
+    dialogues = load_meld_dialogues("train", max_turns=24, data_dir=meld_dir, speaker_prefix=True)
+    assert dialogues[0].utterances[:2] == ["Joey: Hey!", "Ross: Not now."]
+    assert dialogues[1].utterances == ["Monica: Look at this.", "Chandler: Gross."]
+
+
+def test_utterance_view_uses_the_same_prefix(meld_dir):
+    from fine2coarse.data.meld import meld_utterance_examples
+
+    plain = meld_utterance_examples("train", data_dir=meld_dir)
+    prefixed = meld_utterance_examples("train", data_dir=meld_dir, speaker_prefix=True)
+    assert plain[1].text == "Not now."
+    assert prefixed[1].text == "Ross: Not now."
+    assert [e.label for e in plain] == [e.label for e in prefixed]

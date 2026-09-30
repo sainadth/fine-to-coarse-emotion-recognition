@@ -11,7 +11,15 @@ output. Nothing is made public.
     python scripts/kaggle_run.py pull      # download output into results/ and docs/tables/
 
 `push` and `submit` together are the usual start; `submit --wait` blocks until the
-kernel finishes and then pulls the output.
+kernel finishes and then pulls the output. `--kernel sweep` targets the
+hyperparameter-sweep notebook in kaggle/sweep/ instead of the main pipeline.
+
+Every pull keeps the complete kernel output (log, results, tables) under
+kaggle_output/<kernel>/<timestamp>/, so each Kaggle session has its own local copy.
+Run directories are then copied into results/ only where they do not already
+exist; a run that exists locally with different content is left untouched and
+reported (pass --force to overwrite). The baseline results therefore cannot be
+clobbered by a later session that reuses a run name.
 
 Credentials come from `.env` at the repository root. Kaggle now issues a single
 opaque token (it starts with `KGA`), which the CLI reads from KAGGLE_API_TOKEN;
@@ -40,13 +48,15 @@ LOGGER = get_logger()
 
 DATASET_SLUG = "f2c-src"
 DATASET_TITLE = "Fine-to-Coarse Emotion Recognition source"
-KERNEL_SLUG = "f2c-pipeline"
-KERNEL_TITLE = "f2c pipeline"  # Kaggle derives the kernel slug from this title
+# name -> (slug, title, directory, notebook). Kaggle derives the slug from the title.
+KERNELS = {
+    "pipeline": ("f2c-pipeline", "f2c pipeline", "kaggle", "run_pipeline.ipynb"),
+    "sweep": ("f2c-sweep", "f2c sweep", "kaggle/sweep", "sweep.ipynb"),
+}
 SOURCE_DIRS = ("src", "scripts", "configs")
 TOKEN_PATH = Path.home() / ".kaggle" / "kaggle.json"
 ENV_PATH = REPO_ROOT / ".env"
 STAGING = REPO_ROOT / ".kaggle_staging"
-KERNEL_DIR = REPO_ROOT / "kaggle"
 TERMINAL_STATES = {"complete", "error", "cancelAcknowledged", "cancelRequested"}
 
 
@@ -123,12 +133,14 @@ def stage_source() -> Path:
     return STAGING
 
 
-def write_kernel_metadata(user: str, enable_gpu: bool = True) -> Path:
-    KERNEL_DIR.mkdir(exist_ok=True)
+def write_kernel_metadata(user: str, kernel: str, enable_gpu: bool = True) -> Path:
+    slug, title, directory, notebook = KERNELS[kernel]
+    kernel_dir = REPO_ROOT / directory
+    kernel_dir.mkdir(parents=True, exist_ok=True)
     metadata = {
-        "id": f"{user}/{KERNEL_SLUG}",
-        "title": KERNEL_TITLE,
-        "code_file": "run_pipeline.ipynb",
+        "id": f"{user}/{slug}",
+        "title": title,
+        "code_file": notebook,
         "language": "python",
         "kernel_type": "notebook",
         "is_private": True,
@@ -138,7 +150,7 @@ def write_kernel_metadata(user: str, enable_gpu: bool = True) -> Path:
         "competition_sources": [],
         "kernel_sources": [],
     }
-    path = KERNEL_DIR / "kernel-metadata.json"
+    path = kernel_dir / "kernel-metadata.json"
     path.write_text(json.dumps(metadata, indent=2) + "\n")
     return path
 
@@ -157,21 +169,21 @@ def cmd_push(args: argparse.Namespace) -> None:
 
 def cmd_submit(args: argparse.Namespace) -> None:
     user = username()
-    write_kernel_metadata(user, enable_gpu=not args.cpu)
-    push = ["kernels", "push", "-p", str(KERNEL_DIR)]
+    metadata = write_kernel_metadata(user, args.kernel, enable_gpu=not args.cpu)
+    push = ["kernels", "push", "-p", str(metadata.parent)]
     if not args.cpu:
         # enable_gpu in the metadata is not enough on the current Kaggle images:
         # the accelerator has to be named explicitly or the session comes up CPU-only.
         push += ["--accelerator", args.accelerator]
     kaggle(*push)
-    LOGGER.info("kernel queued: https://www.kaggle.com/code/%s/%s", user, KERNEL_SLUG)
+    LOGGER.info("kernel queued: https://www.kaggle.com/code/%s/%s", user, KERNELS[args.kernel][0])
     if args.wait:
-        wait_for_completion(user, args.poll)
+        wait_for_completion(user, args.kernel, args.poll)
         cmd_pull(args)
 
 
-def kernel_status(user: str) -> str:
-    result = kaggle("kernels", "status", f"{user}/{KERNEL_SLUG}", check=False, capture=True)
+def kernel_status(user: str, kernel: str) -> str:
+    result = kaggle("kernels", "status", f"{user}/{KERNELS[kernel][0]}", check=False, capture=True)
     text = (result.stdout or "") + (result.stderr or "")
     for state in ("complete", "running", "queued", "error", "cancelAcknowledged", "cancelRequested"):
         if state.lower() in text.lower():
@@ -179,10 +191,10 @@ def kernel_status(user: str) -> str:
     return text.strip() or "unknown"
 
 
-def wait_for_completion(user: str, poll_seconds: int) -> str:
+def wait_for_completion(user: str, kernel: str, poll_seconds: int) -> str:
     started = time.time()
     while True:
-        state = kernel_status(user)
+        state = kernel_status(user, kernel)
         LOGGER.info("status=%s (%.0f min elapsed)", state, (time.time() - started) / 60)
         if state in TERMINAL_STATES:
             return state
@@ -192,36 +204,65 @@ def wait_for_completion(user: str, poll_seconds: int) -> str:
 def cmd_status(args: argparse.Namespace) -> None:
     user = username()
     if args.wait:
-        wait_for_completion(user, args.poll)
+        wait_for_completion(user, args.kernel, args.poll)
     else:
-        print(kernel_status(user))
+        print(kernel_status(user, args.kernel))
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    return a.stat().st_size == b.stat().st_size and a.read_bytes() == b.read_bytes()
+
+
+def merge_run_dir(source: Path, target: Path, force: bool = False) -> str:
+    """Copy one run directory into results/ without clobbering a different local run.
+
+    Returns "new", "identical", "overwritten" or "conflict".
+    """
+    files = [item for item in source.iterdir() if item.is_file()]
+    if target.exists():
+        differing = [f.name for f in files if not (target / f.name).exists() or not _same_file(f, target / f.name)]
+        if not differing:
+            return "identical"
+        if not force:
+            return "conflict"
+        status = "overwritten"
+    else:
+        status = "new"
+    target.mkdir(parents=True, exist_ok=True)
+    for item in files:
+        shutil.copy2(item, target / item.name)
+    return status
 
 
 def cmd_pull(args: argparse.Namespace) -> None:
     user = username()
-    destination = Path(args.out)
+    slug = KERNELS[args.kernel][0]
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    destination = Path(args.out) / args.kernel / stamp
     destination.mkdir(parents=True, exist_ok=True)
-    kaggle("kernels", "output", f"{user}/{KERNEL_SLUG}", "-p", str(destination))
+    kaggle("kernels", "output", f"{user}/{slug}", "-p", str(destination))
+    files = [f for f in destination.rglob("*") if f.is_file()]
+    LOGGER.info("full kernel output saved locally: %s (%d files)", destination, len(files))
 
-    copied = 0
-    for metrics in (destination / "results").glob("*/metrics.json") if (destination / "results").exists() else []:
-        target = REPO_ROOT / "results" / metrics.parent.name
-        target.mkdir(parents=True, exist_ok=True)
-        for item in metrics.parent.iterdir():
-            if item.is_file():
-                shutil.copy2(item, target / item.name)
-                copied += 1
+    outcome: dict[str, list[str]] = {}
+    source_results = destination / "results"
+    for metrics in sorted(source_results.glob("*/metrics.json")) if source_results.exists() else []:
+        status = merge_run_dir(metrics.parent, REPO_ROOT / "results" / metrics.parent.name, args.force)
+        outcome.setdefault(status, []).append(metrics.parent.name)
     tables = destination / "docs" / "tables"
     if tables.exists():
-        target = REPO_ROOT / "docs" / "tables"
-        target.mkdir(parents=True, exist_ok=True)
-        for item in tables.iterdir():
-            if item.is_file():
-                shutil.copy2(item, target / item.name)
-                copied += 1
-    LOGGER.info("kernel output in %s; copied %d files into results/ and docs/tables/", destination, copied)
+        status = merge_run_dir(tables, REPO_ROOT / "docs" / "tables", args.force)
+        outcome.setdefault(status, []).append("docs/tables")
+    for status in ("new", "overwritten", "identical", "conflict"):
+        if outcome.get(status):
+            LOGGER.info("%s: %s", status, ", ".join(outcome[status]))
+    if outcome.get("conflict"):
+        LOGGER.warning(
+            "left %d local run(s) untouched because Kaggle's copy differs; the Kaggle version "
+            "is in %s. Re-run with --force to overwrite.", len(outcome["conflict"]), destination,
+        )
 
-    log = destination / f"{KERNEL_SLUG}.log"
+    log = destination / f"{slug}.log"
     if log.exists():
         LOGGER.info("last lines of the kernel log:")
         print("\n".join(log.read_text(errors="replace").splitlines()[-20:]))
@@ -243,6 +284,7 @@ def main() -> None:
     submit.add_argument("--accelerator", default="nvidiaTeslaT4",
                         help="Kaggle accelerator name, e.g. nvidiaTeslaT4, nvidiaTeslaP100, nvidiaL4x4")
     submit.add_argument("--out", default="kaggle_output")
+    submit.add_argument("--force", action="store_true", help="with --wait: let the pull overwrite differing runs")
     submit.set_defaults(func=cmd_submit)
 
     status = sub.add_parser("status", help="print or follow the kernel status")
@@ -252,7 +294,11 @@ def main() -> None:
 
     pull = sub.add_parser("pull", help="download kernel output into the repo")
     pull.add_argument("--out", default="kaggle_output")
+    pull.add_argument("--force", action="store_true", help="overwrite local runs that differ from Kaggle's")
     pull.set_defaults(func=cmd_pull)
+
+    for command in (submit, status, pull):
+        command.add_argument("--kernel", choices=sorted(KERNELS), default="pipeline")
 
     args = parser.parse_args()
     args.func(args)

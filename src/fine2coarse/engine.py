@@ -36,6 +36,50 @@ LOGGER = get_logger()
 IGNORE_INDEX = -100
 
 
+class FocalLoss(nn.Module):
+    """Cross-entropy down-weighted on examples the model already gets right.
+
+    With gamma=0 this is exactly (weighted) cross-entropy. Larger gamma shifts
+    gradient mass towards hard examples, which on MELD means the rare classes.
+    """
+
+    def __init__(self, gamma: float = 2.0, weight: torch.Tensor | None = None,
+                 ignore_index: int = IGNORE_INDEX) -> None:
+        super().__init__()
+        self.gamma = gamma
+        self.register_buffer("weight", weight if weight is not None else torch.tensor([]))
+        self.ignore_index = ignore_index
+
+    def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        weight = self.weight if self.weight.numel() else None
+        log_probabilities = torch.log_softmax(logits, dim=-1)
+        loss = nn.functional.nll_loss(
+            log_probabilities, target, weight=weight,
+            ignore_index=self.ignore_index, reduction="none",
+        )
+        keep = target != self.ignore_index
+        if not keep.any():
+            return logits.sum() * 0.0
+        probabilities = log_probabilities.detach().exp()
+        target_probabilities = probabilities.gather(
+            -1, target.clamp(min=0).unsqueeze(-1)
+        ).squeeze(-1)
+        focal = (1.0 - target_probabilities) ** self.gamma
+        return (loss[keep] * focal[keep]).sum() / keep.sum()
+
+
+def build_criterion(loss_type: str, gamma: float, weights: torch.Tensor | None,
+                    label_smoothing: float = 0.0) -> nn.Module:
+    if loss_type == "focal":
+        if label_smoothing:
+            raise ValueError("label_smoothing is only implemented for loss='ce'")
+        return FocalLoss(gamma=gamma, weight=weights)
+    if loss_type == "ce":
+        return nn.CrossEntropyLoss(weight=weights, ignore_index=IGNORE_INDEX,
+                                   label_smoothing=label_smoothing)
+    raise ValueError(f"loss must be 'ce' or 'focal', got {loss_type!r}")
+
+
 @dataclass
 class Stage1Config:
     run_name: str = "stage1_goemotions"
@@ -83,7 +127,11 @@ class Stage2Config:
     freeze_backbone: bool = False
     use_fine_logits: bool = False
     speaker_aware: bool = False
+    speaker_prefix: bool = False  # "Joey: ..." on the current utterance only
     class_weighted_loss: bool = False
+    loss: str = "ce"            # "ce" or "focal"
+    focal_gamma: float = 2.0
+    label_smoothing: float = 0.0
     grad_clip: float = 1.0
     device: str = "auto"
     num_workers: int = 0
@@ -220,6 +268,7 @@ def _stage2_loaders(tokenizer, config: Stage2Config) -> dict[str, DataLoader]:
             max_turns=config.max_turns,
             num_workers=config.num_workers,
             limit=config.limit,
+            speaker_prefix=config.speaker_prefix,
         )
     if config.view == "utterance":
         return build_meld_utterance_dataloaders(
@@ -229,6 +278,7 @@ def _stage2_loaders(tokenizer, config: Stage2Config) -> dict[str, DataLoader]:
             max_length=config.max_length,
             num_workers=config.num_workers,
             limit=config.limit,
+            speaker_prefix=config.speaker_prefix,
         )
     raise ValueError(f"view must be 'dialogue' or 'utterance', got {config.view!r}")
 
@@ -248,15 +298,27 @@ def _stage2_forward(model: SequentialEmotionModel, batch: dict, device: torch.de
 
 
 @torch.no_grad()
-def predict_stage2(model: SequentialEmotionModel, loader: DataLoader, device: torch.device):
+def predict_stage2(model: SequentialEmotionModel, loader: DataLoader, device: torch.device,
+                   with_probs: bool = False):
+    """Labels and argmax predictions; with_probs also returns softmax rows (rounded).
+
+    The probabilities feed dev-fitted decision offsets and seed ensembling
+    (fine2coarse.calibration), which need more than the argmax.
+    """
     model.eval()
     y_true: list[int] = []
     y_pred: list[int] = []
+    probs: list[list[float]] = []
     for batch in tqdm(loader, desc="eval", leave=False):
         logits, labels = _stage2_forward(model, batch, device)
         keep = labels != IGNORE_INDEX
-        y_pred.extend(logits[keep].argmax(dim=-1).cpu().tolist())
+        kept = logits[keep].float()
+        y_pred.extend(kept.argmax(dim=-1).cpu().tolist())
         y_true.extend(labels[keep].cpu().tolist())
+        if with_probs:
+            probs.extend(torch.softmax(kept, dim=-1).cpu().numpy().round(6).tolist())
+    if with_probs:
+        return y_true, y_pred, probs
     return y_true, y_pred
 
 
@@ -304,7 +366,11 @@ def train_stage2(config: Stage2Config) -> dict:
     )
     scaler = torch.amp.GradScaler("cuda", enabled=config.amp and device.type == "cuda")
     weights = class_weights().to(device) if config.class_weighted_loss else None
-    criterion = nn.CrossEntropyLoss(weight=weights, ignore_index=IGNORE_INDEX)
+    criterion = build_criterion(config.loss, config.focal_gamma, weights, config.label_smoothing)
+    LOGGER.info("loss=%s%s%s%s", config.loss,
+                f" gamma={config.focal_gamma}" if config.loss == "focal" else "",
+                f" smoothing={config.label_smoothing}" if config.label_smoothing else "",
+                " class-weighted" if config.class_weighted_loss else "")
 
     best_macro_f1 = -1.0
     best_state: dict[str, torch.Tensor] | None = None
@@ -346,7 +412,8 @@ def train_stage2(config: Stage2Config) -> dict:
 
     if best_state is not None:
         model.load_state_dict(best_state)
-    y_true, y_pred = predict_stage2(model, loaders["test"], device)
+    dev_true, dev_pred, dev_probs = predict_stage2(model, loaders["dev"], device, with_probs=True)
+    y_true, y_pred, test_probs = predict_stage2(model, loaders["test"], device, with_probs=True)
     test_metrics = compute_metrics(y_true, y_pred, MELD_LABELS)
     LOGGER.info("%s test %s", config.system, format_metrics(test_metrics))
 
@@ -362,5 +429,8 @@ def train_stage2(config: Stage2Config) -> dict:
         "checkpoint": str(paths.checkpoint),
     }
     write_json(paths.results / "metrics.json", payload)
-    write_json(paths.results / "test_predictions.json", {"y_true": y_true, "y_pred": y_pred})
+    write_json(paths.results / "test_predictions.json",
+               {"y_true": y_true, "y_pred": y_pred, "probs": test_probs})
+    write_json(paths.results / "dev_predictions.json",
+               {"y_true": dev_true, "y_pred": dev_pred, "probs": dev_probs})
     return payload
