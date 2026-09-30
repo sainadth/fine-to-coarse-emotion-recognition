@@ -41,3 +41,30 @@ def test_every_kernel_has_a_notebook_on_disk():
     root = SCRIPT.parents[1]
     for slug, title, directory, notebook in kaggle_run.KERNELS.values():
         assert (root / directory / notebook).exists(), (slug, directory, notebook)
+
+
+def test_fingerprint_changes_with_source_and_ignores_caches(tmp_path):
+    for name in kaggle_run.SOURCE_DIRS:
+        (tmp_path / name).mkdir()
+    (tmp_path / "src" / "a.py").write_text("x = 1\n")
+    first = kaggle_run.source_fingerprint(tmp_path)
+    (tmp_path / "src" / "__pycache__").mkdir()
+    (tmp_path / "src" / "__pycache__" / "a.cpython-312.pyc").write_bytes(b"junk")
+    (tmp_path / "src" / kaggle_run.SOURCE_ID_FILE).write_text("old\n")
+    assert kaggle_run.source_fingerprint(tmp_path) == first
+    (tmp_path / "src" / "a.py").write_text("x = 2\n")
+    assert kaggle_run.source_fingerprint(tmp_path) != first
+
+
+def test_both_notebooks_can_be_stamped(tmp_path):
+    import shutil
+
+    root = SCRIPT.parents[1]
+    for _, _, directory, notebook in kaggle_run.KERNELS.values():
+        copy = tmp_path / notebook
+        shutil.copy(root / directory / notebook, copy)
+        kaggle_run.stamp_notebook(copy, "abc123")
+        import json
+
+        cells = json.loads(copy.read_text())["cells"]
+        assert any('EXPECTED_SOURCE = "abc123"' in "".join(c["source"]) for c in cells)

@@ -31,6 +31,7 @@ Internet-enabled kernels additionally need a phone-verified account.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -111,6 +112,42 @@ def username() -> str:
     )
 
 
+SOURCE_ID_FILE = "SOURCE_ID"  # written into src/, checked by the notebooks
+IGNORED = ("__pycache__", ".pyc", ".egg-info")
+
+
+def source_fingerprint(root: Path = REPO_ROOT) -> str:
+    """Short hash of everything shipped to Kaggle (src/, scripts/, configs/).
+
+    Kaggle can mount the previous dataset version for a while after a new one
+    reports "ready"; the notebooks compare this against the mounted source and
+    stop before training on stale code.
+    """
+    digest = hashlib.sha256()
+    for name in SOURCE_DIRS:
+        for path in sorted((root / name).rglob("*")):
+            relative = path.relative_to(root).as_posix()
+            if not path.is_file() or any(part in relative for part in IGNORED) or path.name == SOURCE_ID_FILE:
+                continue
+            digest.update(relative.encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()[:16]
+
+
+def stamp_notebook(notebook: Path, fingerprint: str) -> None:
+    """Set EXPECTED_SOURCE = "<fingerprint>" in the notebook before it is pushed."""
+    payload = json.loads(notebook.read_text())
+    stamped = False
+    for cell in payload["cells"]:
+        lines = cell.get("source", [])
+        for i, line in enumerate(lines):
+            if line.startswith("EXPECTED_SOURCE ="):
+                lines[i] = f'EXPECTED_SOURCE = "{fingerprint}"  # set by kaggle_run.py submit\n'
+                stamped = True
+    if not stamped:
+        raise SystemExit(f"{notebook} has no EXPECTED_SOURCE line to stamp")
+    notebook.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n")
+
+
 def stage_source() -> Path:
     if STAGING.exists():
         shutil.rmtree(STAGING)
@@ -119,8 +156,11 @@ def stage_source() -> Path:
         shutil.copytree(
             REPO_ROOT / name,
             STAGING / name,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"),
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info", SOURCE_ID_FILE),
         )
+    fingerprint = source_fingerprint()
+    (STAGING / "src" / SOURCE_ID_FILE).write_text(fingerprint + "\n")
+    LOGGER.info("source fingerprint %s", fingerprint)
     (STAGING / "dataset-metadata.json").write_text(
         json.dumps(
             {"title": DATASET_TITLE, "id": f"{username()}/{DATASET_SLUG}", "licenses": [{"name": "CC0-1.0"}]},
@@ -170,12 +210,20 @@ def cmd_push(args: argparse.Namespace) -> None:
 def cmd_submit(args: argparse.Namespace) -> None:
     user = username()
     metadata = write_kernel_metadata(user, args.kernel, enable_gpu=not args.cpu)
+    fingerprint = source_fingerprint()
+    notebook = metadata.parent / KERNELS[args.kernel][3]
+    original = notebook.read_text()
+    stamp_notebook(notebook, fingerprint)
+    LOGGER.info("notebook expects source %s (run `push` first if the code changed)", fingerprint)
     push = ["kernels", "push", "-p", str(metadata.parent)]
     if not args.cpu:
         # enable_gpu in the metadata is not enough on the current Kaggle images:
         # the accelerator has to be named explicitly or the session comes up CPU-only.
         push += ["--accelerator", args.accelerator]
-    kaggle(*push)
+    try:
+        kaggle(*push)
+    finally:
+        notebook.write_text(original)  # the stamp only needs to exist in the pushed copy
     LOGGER.info("kernel queued: https://www.kaggle.com/code/%s/%s", user, KERNELS[args.kernel][0])
     if args.wait:
         wait_for_completion(user, args.kernel, args.poll)
