@@ -232,6 +232,11 @@ def cmd_submit(args: argparse.Namespace) -> None:
 
 def kernel_status(user: str, kernel: str) -> str:
     result = kaggle("kernels", "status", f"{user}/{KERNELS[kernel][0]}", check=False, capture=True)
+    if result.returncode != 0:
+        # A failed status call (network drop, API hiccup) says nothing about the kernel;
+        # its traceback often contains the word "error", which must not end the wait.
+        LOGGER.warning("status check failed (%s); will retry", (result.stderr or "").strip().splitlines()[-1:] or "?")
+        return "unknown"
     text = (result.stdout or "") + (result.stderr or "")
     for state in ("complete", "running", "queued", "error", "cancelAcknowledged", "cancelRequested"):
         if state.lower() in text.lower():
@@ -288,7 +293,13 @@ def cmd_pull(args: argparse.Namespace) -> None:
     stamp = time.strftime("%Y%m%d-%H%M%S")
     destination = Path(args.out) / args.kernel / stamp
     destination.mkdir(parents=True, exist_ok=True)
-    kaggle("kernels", "output", f"{user}/{slug}", "-p", str(destination))
+    for attempt in range(1, 4):
+        if kaggle("kernels", "output", f"{user}/{slug}", "-p", str(destination), check=False).returncode == 0:
+            break
+        LOGGER.warning("download attempt %d failed; retrying in 60 s", attempt)
+        time.sleep(60)
+    else:
+        raise SystemExit(f"could not download the output of {slug}; run `pull --kernel {args.kernel}` later")
     files = [f for f in destination.rglob("*") if f.is_file()]
     LOGGER.info("full kernel output saved locally: %s (%d files)", destination, len(files))
 
@@ -297,10 +308,17 @@ def cmd_pull(args: argparse.Namespace) -> None:
     for metrics in sorted(source_results.glob("*/metrics.json")) if source_results.exists() else []:
         status = merge_run_dir(metrics.parent, REPO_ROOT / "results" / metrics.parent.name, args.force)
         outcome.setdefault(status, []).append(metrics.parent.name)
+    if source_results.exists() and any(item.is_file() for item in source_results.iterdir()):
+        # files directly under results/, e.g. <prefix>calibration.json
+        status = merge_run_dir(source_results, REPO_ROOT / "results", args.force)
+        outcome.setdefault(status, []).append("results/*.json")
     tables = destination / "docs" / "tables"
-    if tables.exists():
-        status = merge_run_dir(tables, REPO_ROOT / "docs" / "tables", args.force)
-        outcome.setdefault(status, []).append("docs/tables")
+    for directory in [tables, *sorted(p for p in tables.rglob("*") if p.is_dir())] if tables.exists() else []:
+        if not any(item.is_file() for item in directory.iterdir()):
+            continue
+        relative = directory.relative_to(destination)
+        status = merge_run_dir(directory, REPO_ROOT / relative, args.force)
+        outcome.setdefault(status, []).append(relative.as_posix())
     for status in ("new", "overwritten", "identical", "conflict"):
         if outcome.get(status):
             LOGGER.info("%s: %s", status, ", ".join(outcome[status]))

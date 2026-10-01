@@ -68,3 +68,13 @@ def test_both_notebooks_can_be_stamped(tmp_path):
 
         cells = json.loads(copy.read_text())["cells"]
         assert any('EXPECTED_SOURCE = "abc123"' in "".join(c["source"]) for c in cells)
+
+
+def test_failed_status_call_is_not_read_as_kernel_error(monkeypatch):
+    import subprocess
+
+    def fake(*args, **kwargs):
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="ConnectionError: error resolving host")
+
+    monkeypatch.setattr(kaggle_run, "kaggle", fake)
+    assert kaggle_run.kernel_status("someone", "pipeline") == "unknown"
