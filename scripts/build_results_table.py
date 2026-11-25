@@ -145,19 +145,19 @@ def per_class_markdown(runs: dict[str, list[dict]]) -> str:
 def per_class_latex(runs: dict[str, list[dict]], systems: list[str] | None = None) -> str:
     """Per-class precision, recall and F1 for the chosen systems.
 
-    The spec asks for all three per class, not F1 alone. Every system at once would
-    need fifteen numeric columns, so this reports the baseline and the full model,
-    which is the comparison the analysis actually makes.
+    The spec asks for all three per class, for the four required systems, so this is
+    a full-width table with twelve numeric columns.
     """
-    systems = systems or [name for name in ("M1", "M4") if name in runs]
+    systems = systems or [name for name in ("M1", "M2", "M3", "M4") if name in runs]
     spans = " & ".join(rf"\multicolumn{{3}}{{c}}{{{SYSTEM_LABEL[name]}}}" for name in systems)
     cmid = " ".join(rf"\cmidrule(lr){{{2 + 3 * i}-{4 + 3 * i}}}" for i in range(len(systems)))
     lines = [
-        r"\begin{table}[t]",
+        r"\begin{table*}[t]",
         r"\centering",
-        r"\caption{Per-class precision, recall and F1 on the MELD test split (\%), "
+        r"\caption{Per-class precision (P), recall (R) and F1 on the MELD test split (\%), "
         r"mean over three seeds.}",
         r"\label{tab:perclass}",
+        r"\small",
         r"\begin{tabular}{l" + "rrr" * len(systems) + "r}",
         r"\toprule",
         rf"Emotion & {spans} & Support \\",
@@ -174,30 +174,7 @@ def per_class_latex(runs: dict[str, list[dict]], systems: list[str] | None = Non
                 cells.append(f"{statistics.fmean(values):.1f}")
             support = str(group[0]["test"]["per_class"][label]["support"])
         lines.append(f"{label} & " + " & ".join(cells) + f" & {support} " + r"\\")
-    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
-    return "\n".join(lines)
-
-
-def per_class_f1_latex(runs: dict[str, list[dict]]) -> str:
-    """Per-class F1 for every system, so the per-class claims in the text can be checked."""
-    systems = present(runs)
-    lines = [
-        r"\begin{table}[t]", r"\centering",
-        r"\caption{Per-class F1 on the MELD test split (\%), mean over three seeds. "
-        r"Bold marks the best system for each emotion.}",
-        r"\label{tab:perclassf1}", r"\small",
-        r"\begin{tabular}{l" + "r" * len(systems) + "r}", r"\toprule",
-        "Emotion & " + " & ".join(SYSTEM_LABEL[name] for name in systems) + r" & Support \\",
-        r"\midrule",
-    ]
-    for label in MELD_LABELS:
-        means = {name: statistics.fmean(100 * run["test"]["per_class"][label]["f1"] for run in runs[name])
-                 for name in systems}
-        best = max(means, key=means.get)
-        cells = [rf"\textbf{{{means[name]:.1f}}}" if name == best else f"{means[name]:.1f}" for name in systems]
-        support = runs[systems[0]][0]["test"]["per_class"][label]["support"]
-        lines.append(f"{label} & " + " & ".join(cells) + f" & {support} " + r"\\")
-    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}"]
     return "\n".join(lines)
 
 
@@ -244,7 +221,6 @@ def main() -> None:
     )
     (out_dir / "table1.tex").write_text(latex_table(runs), encoding="utf-8")
     (out_dir / "per_class.tex").write_text(per_class_latex(runs), encoding="utf-8")
-    (out_dir / "per_class_f1.tex").write_text(per_class_f1_latex(runs), encoding="utf-8")
     print(main_md, per_class_md, deltas_md, sep="\n\n")
     LOGGER.info("wrote %s, %s and %s", out_dir / "table1.md", out_dir / "table1.tex",
                 out_dir / "per_class.tex")

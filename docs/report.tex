@@ -326,11 +326,10 @@ $M_4 \rightarrow$ ext. & explicit $p^f_t$                & $-1.28$ & $+0.37$ & $
 \end{table*}
 
 \input{tables/per_class.tex}
-\input{tables/per_class_f1.tex}
 
 
-Table~\ref{tab:perclass} separates precision from recall for the baseline and the full
-model. The gains on the rare classes are almost entirely gains in \emph{recall}:
+Table~\ref{tab:perclass} gives per-class precision, recall and F1 for the four required
+systems. The gains on the rare classes are almost entirely gains in \emph{recall}:
 \texttt{fear} recall doubles from $13.3$ to $26.7$ while its precision falls slightly from
 $28.5$ to $25.9$, and \texttt{disgust} recall rises from $13.2$ to $22.1$ with precision
 improving as well, from $27.6$ to $41.3$. The baseline is not confusing these categories so
@@ -339,7 +338,7 @@ use the labels.
 
 \paragraph{$M_1$ vs $M_2$: fine-grained transfer.}
 Transferring the GoEmotions-trained backbone improves macro-F1 by $1.85$ points, positive
-in all three seeds. Per class (Table~\ref{tab:perclassf1}), the effect is almost entirely
+in all three seeds. Per class (Table~\ref{tab:perclass}), the effect is almost entirely
 one category: \texttt{disgust} improves by $13.8$ F1 points, from $17.7$ to $31.5$, while
 every other category moves by at most $1.5$ and \texttt{fear} does not move at all
 ($+0.2$). MELD has only $271$ \texttt{disgust} training examples, too few to learn the

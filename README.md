@@ -156,7 +156,7 @@ python scripts/inline_report.py         # docs/report_inline.tex, one self-conta
 
 | Report item | Command | Output |
 |---|---|---|
-| Main results, per-class tables | `build_results_table.py --prefix v2_ --seeds 42 1 2` | `docs/tables/table1.{md,tex}`, `per_class.tex`, `per_class_f1.tex` |
+| Main results, per-class tables | `build_results_table.py --prefix v2_ --seeds 42 1 2` | `docs/tables/table1.{md,tex}`, `per_class.tex` |
 | Ensemble table | `ensemble.py` | `docs/tables/ensemble.{md,tex}`, `results/ensemble_selection.json` |
 | Decision offsets (negative result) | `calibrate.py --prefix v2_`, then `--prefix v2sp_` | `results/v2_calibration.json`, `results/v2sp_calibration.json` |
 | Contrastive examples, per-class deltas | `error_analysis.py` | `docs/tables/error_analysis.json`, `qualitative.tex` |
