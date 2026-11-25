@@ -470,7 +470,7 @@ below the three-seed figure in Table~\ref{tab:main}, which is itself a reminder 
 a three-seed mean moves.
 
 Dev selects the pool of $M_2$, $M_4$ and the extension, seventeen runs. On test it reaches
-$49.52$ macro-F1, $2.2$ points above the average single $M_4$ run --- larger than any single
+$49.52$ macro-F1, $2.2$ points above the average single $M_4$ run, larger than any single
 architectural effect we measured, including fine-grained transfer at $+1.85$. It also
 improves accuracy to $65.86$ and weighted-F1 to $65.11$. Per class, against the seven-seed
 $M_4$ mean: \texttt{disgust} $+5.0$, \texttt{anger} $+4.2$, \texttt{joy} $+2.8$,
@@ -639,8 +639,8 @@ conclusions generalise to other conversational domains.
 \paragraph{Future work.}
 The ensemble result is the clearest lead. If averaging six runs buys more than any
 architectural change we made, the single-model systems are variance-limited, and the useful
-next step is whatever reduces that variance at training time --- longer schedules with
-averaged weights, or distilling the ensemble back into one model --- rather than another
+next step is whatever reduces that variance at training time (longer schedules with
+averaged weights, or distilling the ensemble back into one model) rather than another
 architectural factor. The gains are also minority-class gains, so reweighting the loss
 looked like an easy next step. It did not help. In our $M_4$ sweep, focal loss matched or lowered dev macro-F1, and
 class weighting lowered it while cutting test accuracy by 5--9 points. The extension result suggests the

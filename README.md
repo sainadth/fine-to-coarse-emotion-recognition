@@ -5,8 +5,7 @@
 > emotion recognition on MELD when dialogue context is modelled by an utterance-level
 > Transformer?
 
-COSC 6341, Fall 2026 — Computer Science Department, TAMUCC. Project specification:
-[`docs/project-spec.pdf`](docs/project-spec.pdf).
+COSC 6341, Fall 2026, Computer Science Department, TAMUCC.
 
 ---
 
@@ -14,11 +13,11 @@ COSC 6341, Fall 2026 — Computer Science Department, TAMUCC. Project specificat
 
 Two training stages and four systems.
 
-**Stage I — fine-grained emotion learning.** RoBERTa-base is fine-tuned on GoEmotions
+**Stage I: fine-grained emotion learning.** RoBERTa-base is fine-tuned on GoEmotions
 with 27 fine-grained classes (the `neutral` class is excluded). The 27-class head
 `W27` is then discarded; the backbone parameters `θ_G` are kept.
 
-**Stage II — sequential coarse emotion learning.** Every utterance of a MELD dialogue is
+**Stage II: sequential coarse emotion learning.** Every utterance of a MELD dialogue is
 encoded by the shared backbone, turn-level positional embeddings are added, an
 utterance-level Transformer encoder (UTE) contextualises the sequence, and a new 7-class
 head predicts the coarse emotion per turn:
@@ -27,7 +26,7 @@ head predicts the coarse emotion per turn:
 U_t → RoBERTa_G → h_t → (+ p_t) → UTE → z_t → W7 → MELD emotion
 ```
 
-`θ_G`, `θ_UTE` and `W7` are all trainable in Stage II — continued fine-tuning, not a
+`θ_G`, `θ_UTE` and `W7` are all trainable in Stage II. This is continued fine-tuning, not a
 frozen feature extractor.
 
 | System | Backbone | UTE | Config |
@@ -44,7 +43,7 @@ M₃ vs M₄ asks whether transfer still helps once context is modelled.
 ## 2. Requirements
 
 * Python 3.10+
-* PyTorch 2.1+ (CUDA, Apple MPS, or CPU — the device is picked automatically)
+* PyTorch 2.1+ (CUDA, Apple MPS, or CPU; the device is picked automatically)
 * ~4 GB GPU memory for the dialogue-level systems at the default settings
 
 A free Colab T4 runs the whole pipeline; see [`notebooks/colab_runner.ipynb`](notebooks/colab_runner.ipynb).
@@ -77,7 +76,7 @@ python scripts/prepare_data.py --dataset all
 Dialogue boundaries and utterance order are preserved; dialogues longer than
 `max_turns` are split into consecutive non-overlapping windows, so no turn is dropped
 and no window spans two dialogues. Train / dev / test stay separate, and the test set is
-only ever used for the final evaluation — model selection uses dev macro-F1.
+only ever used for the final evaluation; model selection uses dev macro-F1.
 
 ## 5. Train
 
@@ -193,7 +192,7 @@ settings on dev and touch test once.
 `ensemble.py` averages the class probabilities of runs that differ only in seed, or in
 system, and scores every candidate on dev. M4 and M5 have seven seeds (42, 1, 2, 3–6). The
 dev-selected ensemble pools M2, M4 and M5 (17 runs) and reaches **49.52 test macro-F1
-against 47.30 ± 0.94 for a single M4 run** — a bigger gain than any single architectural
+against 47.30 ± 0.94 for a single M4 run**, a bigger gain than any single architectural
 factor in the study, and unlike those it raises accuracy too (65.86). The gain is seed
 averaging, not system mixing: seven seeds of M4 alone reach 49.87, and the top three
 candidates are within noise of each other. Pooling all five systems is worse.
@@ -242,7 +241,6 @@ docs/
   report_inline.tex      the same source with every table inlined (generated)
   slides.html            the presentation; open in a browser
   tables/                generated tables the report includes
-  project-spec.pdf       the assignment
 kaggle/                  notebooks that run the pipeline and the recipe sweep on Kaggle GPUs
 notebooks/               Colab runner
 results/                 metrics, predictions and probabilities of the 52 runs behind the
