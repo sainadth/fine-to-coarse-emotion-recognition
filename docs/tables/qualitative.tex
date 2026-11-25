@@ -1,0 +1,27 @@
+\begin{table*}[t]
+\centering
+\caption{Representative contrastive predictions on the MELD test split. \emph{Context} is the preceding turn; \emph{Gold} is the MELD annotation. The two prediction columns are the system that gets the turn right and the one that does not.}
+\label{tab:qualitative}
+\small
+\begin{tabular}{p{0.30\textwidth}p{0.34\textwidth}lll}
+\toprule
+Context (previous turn) & Utterance & Gold & Correct & Wrong \\
+\midrule
+\multicolumn{5}{l}{\textit{Context resolves the utterance: $M_4$ correct, $M_2$ wrong}} \\[2pt]
+Ohh! & Monica: What? & neutral & neutral & surprise \\
+It was just so awkward and bumpy. & Ross: Bumpy? & surprise & surprise & neutral \\
+Well Phoebe, we gotta do something! & Rachel: I mean there's no way Joey's gonna make it in time. & fear & fear & sadness \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Transfer supplies a rare label: $M_4$ correct, $M_3$ wrong}} \\[2pt]
+Howard's the & Ross: Yes but too me he's just, man. & neutral & neutral & sadness \\
+Oh my God! I overslept! I was supposed to be on the set a… & Monica: Oh wait, Joey, you can't go like that! You stink! & disgust & disgust & anger \\
+What's fish hooking? & Ross: Huh, what's fish hooking... Thanks man, that would have bee… & neutral & neutral & surprise \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Context misleads: $M_2$ correct, $M_4$ wrong}} \\[2pt]
+\textit{dialogue start} & Mark: Why do all you're coffee mugs have numbers on the bottom? & surprise & surprise & neutral \\
+\textit{dialogue start} & Joey: Push! & joy & joy & anger \\
+\textit{dialogue start} & Joey: Let's get that ball and really move, hey, hey, ho, ho. & joy & joy & neutral \\
+\addlinespace
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -64,7 +64,7 @@ pip install -e .
 python scripts/prepare_data.py --dataset all
 ```
 
-* **GoEmotions** is pulled from the Hugging Face Hub (`go_emotions`, `simplified`).
+* **GoEmotions** is pulled from the Hugging Face Hub (`google-research-datasets/go_emotions`, `simplified`).
   `neutral` is dropped; because GoEmotions is multi-label and Stage I is a single-label
   cross-entropy classifier, the default policy (`multilabel_policy: single`) keeps only
   examples with exactly one non-neutral label. `first` keeps every example and takes its
@@ -78,36 +78,36 @@ Dialogue boundaries and utterance order are preserved; dialogues longer than
 and no window spans two dialogues. Train / dev / test stay separate, and the test set is
 only ever used for the final evaluation — model selection uses dev macro-F1.
 
-## 5. Run everything
+## 5. Train
 
 ```bash
 bash scripts/run_all.sh
 ```
 
-That is Stage I, then M₁–M₄, then the result tables and the error analysis. To run the
-pieces yourself:
+This trains every run behind the report and then rebuilds its tables (section 6). About
+4 GPU-hours on a Tesla T4: 6.5 minutes per Stage-I run, 3.5 to 5 per Stage-II run.
+
+For each of seven seeds (42, 1, 2, 3, 4, 5, 6) it trains a Stage-I backbone and, from it,
+M₄, the extension and a speaker-aware M₄. For seeds 42, 1 and 2 it also trains M₁, M₂, M₃
+and the speaker-prefix recipe for all five systems. `SEEDS="42 1 2" bash scripts/run_all.sh`
+trains a subset. Model weights are deleted after each seed, so the run needs about
+6 GB of free disk; `KEEP_CHECKPOINTS=1` keeps them (about 23 GB).
+
+| Run names | Recipe | Seeds |
+|---|---|---|
+| `v2_stage1_s*` | Stage I | all seven |
+| `v2_M1_s*` … `v2_M5_s*` | default recipe (M5 is the extension) | M4, M5: all seven; M1–M3: 42, 1, 2 |
+| `v2sp_M*_s*` | `speaker_prefix=true` | 42, 1, 2 |
+| `v3spk_M4_s*` | `speaker_aware=true` | all seven |
+
+To train one piece yourself, any config key can be overridden from the command line:
 
 ```bash
-# Stage I (GoEmotions, 27 classes)
-python scripts/train_stage1.py --config configs/stage1.yaml
-
-# Stage II, one system at a time
-python scripts/train_stage2.py --system M1
-python scripts/train_stage2.py --system M2
-python scripts/train_stage2.py --system M3
-python scripts/train_stage2.py --system M4
-
-# research extension: fine-grained distribution concatenated into the UTE input
-python scripts/train_stage2.py --config configs/m5_extension_fine_logits.yaml
+python scripts/train_stage1.py --config configs/stage1.yaml --set run_name=v2_stage1_s1 seed=1
+python scripts/train_stage2.py --system M4 --set run_name=v2_M4_s1 seed=1 from_stage1=checkpoints/v2_stage1_s1
 ```
 
-Any config key can be overridden from the command line:
-
-```bash
-python scripts/train_stage2.py --system M4 --set epochs=8 batch_size=8 seed=1 run_name=M4_seed1
-```
-
-A two-minute end-to-end check that touches every code path:
+A two-minute end-to-end check that touches every code path, on CPU:
 
 ```bash
 python scripts/train_stage2.py --config configs/smoke.yaml
@@ -140,26 +140,71 @@ python scripts/kaggle_run.py status            # or poll it yourself
 python scripts/kaggle_run.py pull              # copy metrics + tables back into the repo
 ```
 
-Free tier: 30 GPU-hours per week, 12 hours per session -- enough for Stage I plus M1-M4 in one
-kernel. Edit `STAGES` in `kaggle/run_pipeline.ipynb` to run a subset, or set `KEEP_CHECKPOINTS`
-there to keep the Stage-I backbone in the kernel output.
+Free tier: 30 GPU-hours per week, 12 hours per session -- enough for every run in section 5
+in one kernel. `kaggle/run_pipeline.ipynb` lists the seeds and runs it trains; set
+`KEEP_CHECKPOINTS` there to keep the Stage-I backbone in the kernel output.
 
-## 6. Results and analysis
+## 6. Tables and report
 
 ```bash
-python scripts/build_results_table.py     # docs/tables/table1.{md,tex}
-python scripts/error_analysis.py          # docs/tables/error_analysis.json
+bash scripts/build_tables.sh            # every table in the report, from results/
+cd docs && tectonic report.tex          # report.pdf
+python scripts/inline_report.py         # docs/report_inline.tex, one self-contained source file
 ```
 
-`build_results_table.py` emits the required comparison table (accuracy, macro-F1,
-weighted-F1 per system) plus a per-class F1 table. `error_analysis.py` reports per-class
-F1 deltas for the three comparisons, the most frequent confusion pairs, and contrastive
-examples — utterances the context-aware system gets right and the context-free system
-gets wrong, with their preceding turns.
+`build_tables.sh` needs no GPU and takes about a minute. It runs:
+
+| Report item | Command | Output |
+|---|---|---|
+| Main results, per-class tables | `build_results_table.py --prefix v2_ --seeds 42 1 2` | `docs/tables/table1.{md,tex}`, `per_class.tex`, `per_class_f1.tex` |
+| Ensemble table | `ensemble.py` | `docs/tables/ensemble.{md,tex}`, `results/ensemble_selection.json` |
+| Decision offsets (negative result) | `calibrate.py --prefix v2_`, then `--prefix v2sp_` | `results/v2_calibration.json`, `results/v2sp_calibration.json` |
+| Contrastive examples, per-class deltas | `error_analysis.py` | `docs/tables/error_analysis.json`, `qualitative.tex` |
+
+`--seeds 42 1 2` matters: M₄ and the extension have seven seeds, and without it their cells
+would average seven runs next to three for M₁ to M₃. The recipe-sweep table
+(`docs/tables/sweep.{md,tex}`) was written once from the sweep kernel
+(`python scripts/kaggle_run.py submit --kernel sweep`) and is not rebuilt.
+
+**Checking the reported numbers without training.** `results/` ships with the submission:
+the metrics, predictions and probabilities of every run. Rebuild the tables from it and
+compare with the committed ones:
+
+```bash
+bash scripts/build_tables.sh
+git diff --stat docs/tables        # prints nothing: every table is reproduced byte for byte
+```
+
+**What to expect.** Main table: M₁ 45.16, M₂ 47.01, M₃ 46.31, M₄ 47.65 test macro-F1 (three
+seeds). Single M₄ run over seven seeds: 47.30 ± 0.94. Dev-selected ensemble (M₂ + M₄ +
+extension, 17 runs): 49.52 macro-F1, 65.86 accuracy. Speaker-aware against M₄, paired over
+seven seeds: −0.50 macro-F1.
 
 MELD is heavily class-imbalanced (47% `neutral`, 2.7% `disgust`), so **macro-F1 is the
 headline metric**. `class_weighted_loss: true` enables inverse-frequency weighting; it is
 off by default so the four systems stay comparable.
+
+### Post-hoc: ensembling and decision offsets
+
+Both act on saved probabilities, so neither needs a GPU or a retrain. Both choose their
+settings on dev and touch test once.
+
+`ensemble.py` averages the class probabilities of runs that differ only in seed, or in
+system, and scores every candidate on dev. M4 and M5 have seven seeds (42, 1, 2, 3–6). The
+dev-selected ensemble pools M2, M4 and M5 (17 runs) and reaches **49.52 test macro-F1
+against 47.30 ± 0.94 for a single M4 run** — a bigger gain than any single architectural
+factor in the study, and unlike those it raises accuracy too (65.86). The gain is seed
+averaging, not system mixing: seven seeds of M4 alone reach 49.87, and the top three
+candidates are within noise of each other. Pooling all five systems is worse.
+
+Speaker-aware modelling (`speaker_aware=true`, runs
+`v3spk_M4_s*`) does not help: −0.50 test macro-F1 against M4 over seven paired seeds.
+
+`calibrate.py` fits one additive offset per class on dev to maximise dev macro-F1. It is
+kept because the negative result is worth having: the offsets improve dev in all ten
+system-by-variant combinations and make **test worse in nine of them**. Seven free
+parameters on 1,109 dev utterances (25 of them `fear`) fit the dev sample, not the label
+prior. The report presents it as a negative result and uses ensembling instead.
 
 ## 7. Outputs
 
@@ -168,8 +213,10 @@ off by default so the four systems stay comparable.
 | Stage-I backbone (`θ_G`) + discarded head | `checkpoints/stage1_goemotions/{backbone,fine_head.pt}` |
 | Stage-II checkpoints | `checkpoints/<run_name>/model.pt` |
 | Per-run metrics and history | `results/<run_name>/metrics.json` |
-| Per-run test predictions | `results/<run_name>/test_predictions.json` |
+| Per-run dev/test predictions and probabilities | `results/<run_name>/{dev,test}_predictions.json` |
 | Comparison tables | `docs/tables/table1.md`, `docs/tables/table1.tex` |
+| Ensemble table and dev selection | `docs/tables/ensemble.{md,tex}`, `results/ensemble_selection.json` |
+| Decision-offset results | `results/v2_calibration.json`, `results/v2sp_calibration.json` |
 | Error analysis | `docs/tables/error_analysis.json` |
 | Report source | `docs/report.tex`, `docs/report.bib` |
 | Report PDF | `docs/report.pdf` (build: `cd docs && tectonic report.tex`) |
@@ -207,12 +254,24 @@ tests/
 
 ## 10. Reproducibility notes
 
+* **Same setup, same numbers.** The reported runs were made on a Kaggle Tesla T4 with
+  torch 2.10.0+cu128 and transformers 5.0.0 (section 5b). On that setup training is
+  repeatable to the last digit. On 2026-11-25 a fresh `bash scripts/run_all.sh` on Kaggle
+  retrained all 52 runs in 243 minutes; every run's test metrics and predictions, and every
+  table, came out identical to the ones shipped here.
+* **Different setup, close numbers.** On another GPU or other library versions the same
+  seeds give close but not identical results; seven seeds of M₄ span 45.6 to 48.6 test
+  macro-F1, so a single run can land anywhere in that range.
+* **Tables are exact everywhere.** Rebuilding the tables from the shipped `results/`
+  (section 6) was tested in a clean `python:3.12-slim` container with torch 2.15.0 and
+  transformers 5.24.1, and gave byte-identical tables.
 * Every run records its full config, per-epoch history, and test metrics in
   `results/<run_name>/metrics.json`.
-* Seeds are set for Python, NumPy and Torch (`seed: 42` by default). GPU kernels remain
-  non-deterministic, so expect small run-to-run differences; report the seed with results.
+* Seeds are set for Python, NumPy and Torch; report the seed with any result.
 * Checkpoint selection is by dev macro-F1; the test set is never used for selection.
 * Mixed precision is enabled only on CUDA.
+* Model weights are not kept (`run_all.sh` deletes them after each seed unless
+  `KEEP_CHECKPOINTS=1`); `results/` holds metrics, predictions and probabilities for every run.
 
 ## 11. Citations
 

@@ -32,3 +32,7 @@ kaggle/sweep/kernel-metadata.json
 
 # latex build products
 docs/report.pdf
+
+# Submission snapshot: the runs behind the report (results/v2_*, v2sp_*, v3spk_*,
+# ensemble_selection.json) and docs/report.pdf are force-added so the tables can be
+# rebuilt and checked without training. Other runs stay local.

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fine-to-Coarse Sequential Emotion Recognition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap" rel="stylesheet">
+<style>
+/* Seven emotions, seven colours: the deck's whole visual language. */
+:root {
+  --bg: #edf0f5; --panel: #ffffff; --ink: #141a2e; --muted: #5b6478; --line: #cdd4e0;
+  --anger: #d7263d; --disgust: #6e8b3d; --fear: #7c5cd6; --joy: #f2b01e;
+  --neutral: #8e97a8; --sadness: #3b82f6; --surprise: #12a594;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); }
+body { font-family: 'Plus Jakarta Sans', 'Avenir Next', 'Segoe UI', system-ui, sans-serif; }
+#stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform-origin: 0 0; }
+.slide { position: absolute; inset: 0; padding: 72px 96px; opacity: 0; visibility: hidden; transition: opacity .45s ease, visibility 0s .45s; }
+.slide.active { opacity: 1; visibility: visible; transition: opacity .45s ease; }
+h1 { font-size: 108px; line-height: 1.02; font-weight: 800; letter-spacing: -3px; }
+h2 { font-size: 56px; line-height: 1.08; font-weight: 800; letter-spacing: -1.6px; max-width: 1300px; }
+p { font-size: 28px; line-height: 1.35; }
+.muted { color: var(--muted); }
+.big { font-size: 40px; line-height: 1.2; font-weight: 500; letter-spacing: -.5px; }
+.num { font-variant-numeric: tabular-nums; }
+aside { display: none; }
+
+/* step reveals: an element with data-at="n" appears at step n */
+[data-at] { opacity: 0; transform: translateY(18px); transition: opacity .5s var(--ease), transform .6s var(--ease); }
+[data-at].on { opacity: 1; transform: none; }
+
+/* speech bubbles */
+.bubble { display: inline-block; padding: 22px 34px; border-radius: 34px 34px 34px 8px; background: var(--panel); font-size: 44px; font-weight: 600; letter-spacing: -.5px; box-shadow: 0 2px 0 var(--line); }
+.bubble small { display: block; font-size: 22px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-bottom: 4px; }
+.pill { display: inline-flex; align-items: center; gap: 12px; padding: 10px 22px 10px 14px; border-radius: 999px; background: var(--panel); font-size: 26px; font-weight: 600; }
+.pill::before { content: ''; width: 22px; height: 22px; border-radius: 50%; background: var(--c); }
+
+/* 1 title */
+#s-title h1 { margin-top: 70px; }
+#s-title .sub { margin-top: 44px; max-width: 900px; }
+.spectrum { position: absolute; left: 96px; right: 96px; bottom: 150px; display: flex; gap: 10px; height: 26px; }
+.spectrum i { border-radius: 13px; background: var(--c); transform: scaleX(0); transform-origin: left; transition: transform .9s var(--ease); transition-delay: calc(var(--n) * 90ms + 300ms); }
+.active .spectrum i { transform: none; }
+.byline { position: absolute; left: 96px; bottom: 72px; }
+
+/* 2 problem */
+.talk { position: absolute; left: 96px; top: 300px; display: flex; flex-direction: column; gap: 26px; align-items: flex-start; }
+.talk .target { font-size: 120px; padding: 30px 60px; border-radius: 60px 60px 60px 12px; background: var(--surprise); color: #fff; transition: background .9s ease; }
+.st2 .talk .target { background: var(--neutral); }
+.talk .ctx { transform: translateY(18px) scale(.9); transform-origin: left bottom; }
+.read { position: absolute; left: 800px; top: 300px; width: 704px; }
+.read .verdict { font-size: 96px; font-weight: 800; letter-spacing: -2.5px; line-height: 1; }
+.read .v1 { color: var(--surprise); transition: opacity .5s, transform .6s var(--ease); }
+.st2 .read .v1 { opacity: .22; text-decoration: line-through; text-decoration-thickness: 6px; }
+.read .v2 { color: var(--muted); margin-top: 18px; }
+.read p { margin-top: 26px; }
+
+/* 3 dataset: 2,610 dots, one per test utterance */
+.dots { position: absolute; left: 96px; top: 250px; width: 1392px; display: grid; grid-template-columns: repeat(87, 12px); gap: 4px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--c); opacity: 0; transition: opacity .35s ease; }
+.active .dots i { opacity: 1; }
+.st2 .dots i.common { opacity: .13; }
+.legend { position: absolute; left: 96px; right: 60px; top: 760px; display: flex; gap: 10px; }
+.st2 .legend .pill.common { opacity: .35; }
+.legend .pill { transition: opacity .5s; font-size: 23px; padding: 8px 18px 8px 12px; }
+.callout { position: absolute; right: 96px; top: 150px; text-align: right; }
+
+/* 4 + 7: the 2 x 2 design square */
+.square { position: absolute; left: 330px; top: 240px; display: grid; grid-template-columns: 400px 400px; grid-template-rows: 200px 200px; gap: 100px 260px; }
+.cell { border-radius: 26px; background: var(--panel); padding: 24px 30px; position: relative; box-shadow: 0 2px 0 var(--line); }
+.cell b { font-size: 34px; font-weight: 700; }
+.cell span { display: block; font-size: 24px; color: var(--muted); margin-top: 4px; }
+.cell .f1 { font-style: normal; font-size: 92px; font-weight: 800; letter-spacing: -3px; line-height: 1; margin-top: 8px; display: block; color: var(--ink); }
+.cell.full { background: var(--ink); color: #fff; box-shadow: none; }
+.cell.full span { color: #b8c0d4; }
+.cell.full .f1 { color: #fff; }
+.axis-x, .axis-y { position: absolute; font-size: 26px; font-weight: 600; color: var(--muted); }
+.axis-x { top: 190px; width: 400px; text-align: center; }
+.axis-y { left: 96px; width: 210px; text-align: right; line-height: 1.2; }
+.delta { position: absolute; font-size: 40px; font-weight: 800; letter-spacing: -1px; padding: 6px 18px; border-radius: 999px; color: #fff; white-space: nowrap; }
+.delta small { font-size: 22px; font-weight: 600; opacity: .9; margin-left: 8px; letter-spacing: 0; }
+.d-transfer { background: var(--sadness); }
+.d-context { background: var(--surprise); }
+.d-both { background: var(--anger); }
+.note { position: absolute; left: 96px; right: 96px; top: 770px; }
+.note p { font-size: 30px; }
+
+/* 5 pipeline */
+.lab { position: absolute; left: 96px; top: 230px; width: 1408px; height: 520px; }
+.block { position: absolute; border-radius: 22px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 30px; font-weight: 700; transition: transform 1s var(--ease), opacity .7s ease, background .7s ease; }
+.enc { left: 420px; top: 250px; width: 380px; height: 150px; background: var(--sadness); color: #fff; }
+.head27 { left: 470px; top: 130px; width: 280px; height: 96px; background: var(--panel); box-shadow: 0 2px 0 var(--line); }
+.st1 .head27 { transform: translateY(-110px) rotate(-8deg); opacity: 0; }
+.st2 .enc { transform: translateX(520px); }
+.ute { left: 940px; top: 130px; width: 380px; height: 96px; background: var(--surprise); color: #fff; opacity: 0; transform: translateY(-60px); }
+.head7 { left: 940px; top: 14px; width: 380px; height: 92px; font-size: 26px; background: var(--ink); color: #fff; gap: 8px; opacity: 0; transform: translateY(-60px); transition-delay: .25s; }
+.head7 i { width: 18px; height: 18px; border-radius: 50%; background: var(--c); }
+.st2 .ute, .st2 .head7 { opacity: 1; transform: none; }
+.chips { position: absolute; left: 0; top: 150px; width: 380px; display: flex; flex-wrap: wrap; gap: 10px; transition: opacity .7s; }
+.chips span { font-size: 21px; font-weight: 500; padding: 6px 14px; border-radius: 999px; background: var(--panel); }
+.st2 .chips { opacity: .25; }
+.ghost { position: absolute; left: 420px; top: 250px; width: 380px; height: 150px; border-radius: 22px; border: 3px dashed var(--line); }
+.stage-name { position: absolute; top: 440px; font-size: 26px; font-weight: 600; color: var(--muted); transition: opacity .6s; }
+.sn1 { left: 420px; width: 380px; text-align: center; }
+.sn2 { left: 940px; width: 380px; text-align: center; opacity: 0; }
+.st2 .sn2 { opacity: 1; }
+.gone { position: absolute; left: 470px; top: 70px; width: 280px; text-align: center; font-size: 24px; font-weight: 600; color: var(--anger); opacity: 0; transition: opacity .6s .3s; }
+.st1 .gone { opacity: 1; }
+.st2 .gone { opacity: 0; }
+
+/* 6 architecture */
+.arch { position: absolute; left: 96px; top: 215px; width: 1000px; height: 600px; }
+.turn { position: absolute; top: 0; width: 290px; }
+.turn .bubble { font-size: 27px; padding: 14px 22px; width: 100%; }
+.tok { position: absolute; top: 150px; width: 290px; height: 74px; border-radius: 18px; background: var(--sadness); color: #fff; font-size: 26px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.band { position: absolute; left: 0; top: 300px; width: 950px; height: 130px; border-radius: 26px; background: var(--surprise); color: #fff; font-size: 30px; font-weight: 700; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 16px; }
+.arcs { position: absolute; left: 0; top: 296px; width: 950px; height: 90px; }
+.arcs path { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 700; stroke-dashoffset: 700; transition: stroke-dashoffset 1.1s var(--ease); }
+.st1 .arcs path { stroke-dashoffset: 0; }
+.out { position: absolute; top: 475px; width: 290px; text-align: center; }
+.out .pill { font-size: 28px; }
+.wire { position: absolute; width: 4px; background: var(--line); }
+.arch-notes { position: absolute; left: 1150px; top: 240px; width: 360px; display: flex; flex-direction: column; gap: 30px; }
+.arch-notes p { font-size: 25px; }
+.arch-notes b { display: block; font-size: 30px; }
+
+/* 8 per-class bars */
+.chart { position: absolute; top: 250px; width: 560px; height: 430px; }
+.chart h3 { font-size: 40px; font-weight: 700; letter-spacing: -.5px; }
+.bars { position: absolute; left: 0; bottom: 0; width: 100%; height: 330px; display: flex; align-items: flex-end; gap: 34px; border-bottom: 3px solid var(--ink); }
+.bar { width: 110px; border-radius: 14px 14px 0 0; background: var(--c); position: relative; transform: scaleY(0); transform-origin: bottom; transition: transform 1s var(--ease); transition-delay: calc(var(--n) * 140ms); }
+.on .bar { transform: none; }
+.bar b { position: absolute; left: 0; right: 0; top: -44px; text-align: center; font-size: 30px; font-weight: 700; }
+.bar em { position: absolute; left: 0; right: 0; bottom: -46px; text-align: center; font-size: 26px; font-style: normal; font-weight: 600; color: var(--muted); }
+.bar.dim { opacity: .45; }
+.takeaway { position: absolute; left: 96px; right: 96px; top: 770px; }
+
+/* 9 examples */
+.ex { position: absolute; top: 250px; width: 680px; display: flex; flex-direction: column; gap: 18px; align-items: flex-start; }
+.ex .bubble { font-size: 40px; }
+.ex .bubble.t { background: var(--ink); color: #fff; box-shadow: none; }
+.ex .bubble.t small { color: #b8c0d4; }
+.guess { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 600; margin-top: 6px; }
+.guess .pill { font-size: 34px; }
+.guess s { text-decoration-thickness: 3px; color: var(--muted); }
+
+/* 10 variance and ensemble */
+.track { position: absolute; left: 150px; top: 430px; width: 1300px; height: 4px; background: var(--ink); }
+.tick { position: absolute; top: 14px; font-size: 24px; color: var(--muted); transform: translateX(-50%); }
+.run { position: absolute; top: -17px; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; background: var(--joy); border: 3px solid var(--ink); left: var(--x); opacity: 0; transform: translateY(-90px); transition: opacity .4s, transform .8s var(--ease), left 1.2s var(--ease); transition-delay: calc(var(--n) * 90ms); }
+.active .run { opacity: 1; transform: none; }
+.st1 .run { left: 1170px; transform: scale(1.5); transition-delay: calc(var(--n) * 50ms); }
+.mean { position: absolute; left: 598px; top: -120px; text-align: center; transform: translateX(-50%); transition: opacity .5s; }
+.st1 .mean { opacity: .3; }
+.ens { position: absolute; right: 0; top: -250px; text-align: right; white-space: nowrap; }
+.ens .v { font-size: 150px; font-weight: 800; letter-spacing: -5px; line-height: .9; }
+.nulls { position: absolute; left: 150px; top: 590px; width: 1300px; display: flex; gap: 22px; }
+.nulls div { flex: 1; background: var(--panel); border-radius: 22px; padding: 20px 26px; box-shadow: 0 2px 0 var(--line); }
+.nulls b { font-size: 28px; }
+.nulls p { font-size: 23px; color: var(--muted); margin-top: 4px; }
+
+/* 11 conclusions */
+.points { position: absolute; left: 96px; right: 96px; top: 230px; display: flex; flex-direction: column; gap: 30px; }
+.points div { display: flex; gap: 26px; align-items: flex-start; }
+.points i { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c); margin-top: 10px; }
+.points p { font-size: 40px; line-height: 1.16; font-weight: 600; letter-spacing: -.6px; max-width: 1250px; }
+.points p span { display: block; font-size: 26px; font-weight: 400; letter-spacing: 0; color: var(--muted); margin-top: 6px; }
+
+/* 12 questions */
+.qa { position: absolute; left: 96px; top: 190px; font-size: 180px; font-weight: 800; letter-spacing: -6px; padding: 44px 84px 52px; border-radius: 96px 96px 96px 18px; background: var(--ink); color: #fff; box-shadow: none; transform: scale(.6); transform-origin: left bottom; opacity: 0; transition: transform .8s var(--ease), opacity .4s; }
+.active .qa { transform: none; opacity: 1; }
+.thanks { position: absolute; left: 96px; top: 560px; }
+
+/* chrome */
+#bar { position: fixed; left: 0; bottom: 0; height: 5px; background: var(--ink); transition: width .4s var(--ease); }
+#hint { position: fixed; right: 18px; bottom: 14px; font-size: 13px; color: var(--muted); }
+#notes { position: fixed; left: 0; right: 0; bottom: 0; background: var(--ink); color: #fff; padding: 18px 28px 22px; font-size: 18px; line-height: 1.45; display: none; }
+#notes.show { display: block; }
+.still * { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: .01s !important; transition-delay: 0s !important; } }
+</style>
+</head>
+<body>
+<main id="stage">
+
+<section class="slide" id="s-title" aria-label="Title">
+  <h1>Fine-to-coarse<br>emotion recognition<br>in dialogue</h1>
+  <p class="big muted sub">Does learning 27 fine-grained emotions first still help once the model can read the whole conversation?</p>
+  <div class="spectrum" aria-hidden="true">
+    <i style="--c:var(--neutral);--n:0;flex:1256"></i><i style="--c:var(--joy);--n:1;flex:402"></i><i style="--c:var(--anger);--n:2;flex:345"></i><i style="--c:var(--surprise);--n:3;flex:281"></i><i style="--c:var(--sadness);--n:4;flex:208"></i><i style="--c:var(--disgust);--n:5;flex:68"></i><i style="--c:var(--fear);--n:6;flex:50"></i>
+  </div>
+  <p class="byline">Sainadth Pagadala <span class="muted">· COSC 6341, Fall 2026 · Advisor: Dr. Minhua Huang</span></p>
+  <aside>The coloured strip is the MELD test set by emotion, to scale: grey is neutral, the two slivers at the right are disgust and fear. One-line summary: transfer and context both help and add up, but run-to-run variance turned out larger than either.</aside>
+</section>
+
+<section class="slide" id="s-problem" data-steps="2" aria-label="The problem">
+  <h2>The same words, a different emotion</h2>
+  <div class="talk">
+    <div class="bubble ctx" data-at="2"><small>previous turn</small>“Ohh!”</div>
+    <div class="bubble target">“What?”</div>
+  </div>
+  <div class="read">
+    <p class="muted" data-at="1">Read on its own, a model says</p>
+    <div class="verdict v1" data-at="1">surprise</div>
+    <div data-at="2">
+      <div class="verdict v2">neutral</div>
+      <p>After “Ohh!” it is only a reply. That is the label in MELD, and what the context-aware model predicts.</p>
+    </div>
+  </div>
+  <aside>A real MELD test turn. Step one: the utterance alone looks like surprise. Step two: bring in the previous turn and the bubble changes colour with the reading. This is why we model the dialogue and not only the utterance.</aside>
+</section>
+
+<section class="slide" id="s-data" data-steps="2" aria-label="The dataset">
+  <h2>2,610 test utterances, one dot each</h2>
+  <p class="big callout" data-at="2"><b>118 dots</b> are fear or disgust.</p>
+  <div class="dots" id="dots" aria-hidden="true"></div>
+  <div class="legend" data-at="1">
+    <span class="pill common" style="--c:var(--neutral)">neutral <b class="num" data-count="1256"></b></span>
+    <span class="pill common" style="--c:var(--joy)">joy <b class="num" data-count="402"></b></span>
+    <span class="pill common" style="--c:var(--anger)">anger <b class="num" data-count="345"></b></span>
+    <span class="pill common" style="--c:var(--surprise)">surprise <b class="num" data-count="281"></b></span>
+    <span class="pill common" style="--c:var(--sadness)">sadness <b class="num" data-count="208"></b></span>
+    <span class="pill" style="--c:var(--disgust)">disgust <b class="num" data-count="68"></b></span>
+    <span class="pill" style="--c:var(--fear)">fear <b class="num" data-count="50"></b></span>
+  </div>
+  <aside>Every dot is one test utterance, coloured by its gold emotion. Nearly half are neutral, so accuracy is dominated by neutral and macro-F1 is the metric that matters. Step two: only 118 dots are fear or disgust, and MELD's training set has about 270 of each. Too few to learn from, which is why borrowing from a bigger emotion corpus is worth trying.</aside>
+</section>
+
+<section class="slide" id="s-design" data-steps="4" aria-label="Research question and the four systems">
+  <h2>Two switches, four systems</h2>
+  <div class="axis-x" style="left:330px">classify each turn alone</div>
+  <div class="axis-x" style="left:990px">read the dialogue (UTE)</div>
+  <div class="axis-y" style="top:310px">plain RoBERTa-base</div>
+  <div class="axis-y" style="top:590px">RoBERTa trained on GoEmotions first</div>
+  <div class="square">
+    <div class="cell" data-at="1"><b>M₁</b><span>baseline</span></div>
+    <div class="cell" data-at="3"><b>M₃</b><span>context only</span></div>
+    <div class="cell" data-at="2"><b>M₂</b><span>transfer only</span></div>
+    <div class="cell full" data-at="4"><b>M₄</b><span>transfer and context: the full model</span></div>
+  </div>
+  <div class="note" data-at="4"><p>The question is the right-hand column: <span class="muted">does the bottom row still beat the top row once the model reads the dialogue?</span></p></div>
+  <aside>Two binary factors. Rows: where the encoder starts. Columns: whether an utterance-level Transformer reads the dialogue. M1 to M2 isolates transfer, M1 to M3 isolates context, M3 to M4 is the research question: does fine-grained transfer still help when context is already modelled.</aside>
+</section>
+
+<section class="slide" id="s-pipeline" data-steps="2" aria-label="Two-stage training">
+  <h2>Learn emotions first, then dialogue</h2>
+  <div class="lab">
+    <div class="chips" aria-hidden="true"><span>admiration</span><span>amusement</span><span>annoyance</span><span>gratitude</span><span>remorse</span><span>pride</span><span>relief</span><span>grief</span><span>curiosity</span><span>embarrassment</span><span>+ 17 more</span></div>
+    <div class="gone">head discarded</div>
+    <div class="ghost"></div>
+    <div class="block head27">27-class head</div>
+    <div class="block enc">RoBERTa encoder</div>
+    <div class="block head7"><i style="--c:var(--anger)"></i><i style="--c:var(--disgust)"></i><i style="--c:var(--fear)"></i><i style="--c:var(--joy)"></i><i style="--c:var(--neutral)"></i><i style="--c:var(--sadness)"></i><i style="--c:var(--surprise)"></i>&nbsp; new head</div>
+    <div class="block ute">dialogue Transformer (UTE)</div>
+    <div class="stage-name sn1">Stage I · GoEmotions</div>
+    <div class="stage-name sn2">Stage II · MELD, 7 emotions</div>
+  </div>
+  <p class="takeaway big" data-at="2">What crosses between stages is the encoder, not the classifier. All of it keeps training in Stage II.</p>
+  <aside>Stage one: fine-tune RoBERTa-base on GoEmotions, 27 fine-grained classes with neutral dropped; 58.3 macro-F1 on its test split. Click: the 27-class head is thrown away. Click: the encoder moves under a dialogue-level Transformer and a new seven-class head on MELD. The encoder, the UTE and the head all train in stage two; it is continued fine-tuning, not a frozen feature extractor.</aside>
+</section>
+
+<section class="slide" id="s-arch" data-steps="2" aria-label="Architecture">
+  <h2>Encode each turn, then read the dialogue</h2>
+  <div class="arch">
+    <div class="turn" style="left:0"><div class="bubble"><small>turn 1</small>“It was awkward and bumpy.”</div></div>
+    <div class="turn" style="left:330px"><div class="bubble"><small>turn 2</small>“Bumpy?”</div></div>
+    <div class="turn" style="left:660px"><div class="bubble"><small>turn 3</small>“You know what I mean.”</div></div>
+    <div class="tok" style="left:0">encoder → h₁ + p₁</div>
+    <div class="tok" style="left:330px">encoder → h₂ + p₂</div>
+    <div class="tok" style="left:660px">encoder → h₃ + p₃</div>
+    <div class="wire" style="left:143px;top:224px;height:76px"></div><div class="wire" style="left:473px;top:224px;height:76px"></div><div class="wire" style="left:803px;top:224px;height:76px"></div>
+    <div class="band">utterance-level Transformer encoder</div>
+    <svg class="arcs" viewBox="0 0 950 90" aria-hidden="true"><path d="M145 70 Q310 -10 475 70"/><path d="M475 70 Q640 -10 805 70"/><path d="M145 76 Q475 -40 805 76"/></svg>
+    <div class="out" style="left:0" data-at="2"><span class="pill" style="--c:var(--neutral)">neutral</span></div>
+    <div class="out" style="left:330px" data-at="2"><span class="pill" style="--c:var(--surprise)">surprise</span></div>
+    <div class="out" style="left:660px" data-at="2"><span class="pill" style="--c:var(--neutral)">neutral</span></div>
+  </div>
+  <div class="arch-notes">
+    <p><b>Shared encoder</b>The same RoBERTa encodes every turn; a turn-position embedding is added.</p>
+    <p data-at="1"><b>Attention across turns</b>2 layers, 8 heads. Each turn sees the others.</p>
+    <p data-at="2"><b>A label per turn</b>M₁ and M₂ skip the green band and classify each turn alone.</p>
+  </div>
+  <aside>Walk one dialogue through it. Each utterance goes through the same encoder and gets a turn-position embedding. Click: the utterance-level Transformer lets every turn attend to the others. Click: a new seven-class head labels each turn. “Bumpy?” comes out as surprise because of the turn before it. M1 and M2 are this picture without the green band; M1 and M3 start the blue blocks from RoBERTa-base.</aside>
+</section>
+
+<section class="slide" id="s-results" data-steps="5" aria-label="Main results">
+  <h2>Each switch adds macro-F1, in every seed</h2>
+  <div class="axis-x" style="left:330px">each turn alone</div>
+  <div class="axis-x" style="left:990px">with dialogue context</div>
+  <div class="axis-y" style="top:322px">RoBERTa-base</div>
+  <div class="axis-y" style="top:622px">GoEmotions first</div>
+  <div class="square">
+    <div class="cell" data-at="1"><b>M₁</b><i class="f1 num" data-count="45.2" data-from="40"></i></div>
+    <div class="cell" data-at="3"><b>M₃</b><i class="f1 num" data-count="46.3" data-from="45.2"></i></div>
+    <div class="cell" data-at="2"><b>M₂</b><i class="f1 num" data-count="47.0" data-from="45.2"></i></div>
+    <div class="cell full" data-at="4"><b>M₄</b><i class="f1 num" data-count="47.7" data-from="46.3"></i></div>
+  </div>
+  <div class="delta d-transfer" style="left:412px;top:461px" data-at="2">+1.85<small>transfer</small></div>
+  <div class="delta d-context" style="left:748px;top:311px" data-at="3">+1.15<small>context</small></div>
+  <div class="delta d-transfer" style="left:1072px;top:461px" data-at="4">+1.34<small>transfer</small></div>
+  <div class="delta d-both" style="left:762px;top:461px" data-at="5">+2.49<small>both</small></div>
+  <div class="note" data-at="5"><p><b>Yes: transfer still helps after context is modelled.</b> <span class="muted">Accuracy stays near 64 to 65, because every gain comes from rare classes.</span></p></div>
+  <aside>Test macro-F1, mean of three seeds. The gaps are about the size of the seed spread, so every difference here is computed within a seed and then averaged. Baseline 45.2. Transfer alone plus 1.85. Context alone plus 1.15. Transfer on top of context plus 1.34: that is the research question, and the answer is yes. Both together plus 2.49, close to the sum, so the two factors do different jobs. All twelve per-seed differences are positive. Three seeds show direction; we do not claim significance.</aside>
+</section>
+
+<section class="slide" id="s-class" data-steps="3" aria-label="Per-class results">
+  <h2>Each switch rescues a different rare emotion</h2>
+  <div class="chart" style="left:140px" data-at="1">
+    <h3>disgust <span class="muted" style="font-weight:500">F1</span></h3>
+    <div class="bars" style="--c:var(--disgust)">
+      <div class="bar dim" style="height:159px;--n:0"><b>17.7</b><em>M₁</em></div>
+      <div class="bar" style="height:284px;--n:1"><b>31.5</b><em>M₂</em></div>
+      <div class="bar" style="height:231px;--n:2"><b>25.7</b><em>M₃</em></div>
+      <div class="bar" style="height:256px;--n:3"><b>28.4</b><em>M₄</em></div>
+    </div>
+  </div>
+  <div class="chart" style="left:860px" data-at="2">
+    <h3>fear <span class="muted" style="font-weight:500">F1</span></h3>
+    <div class="bars" style="--c:var(--fear)">
+      <div class="bar dim" style="height:163px;--n:0"><b>18.1</b><em>M₁</em></div>
+      <div class="bar dim" style="height:165px;--n:1"><b>18.3</b><em>M₂</em></div>
+      <div class="bar dim" style="height:163px;--n:2"><b>18.1</b><em>M₃</em></div>
+      <div class="bar" style="height:235px;--n:3"><b>26.1</b><em>M₄</em></div>
+    </div>
+  </div>
+  <p class="takeaway big" data-at="3">Transfer alone lifts disgust. Fear moves only when both are on. The gain is recall: fear recall doubles, 13.3 → 26.7.</p>
+  <aside>Per-class F1, three-seed means, bars from zero. Disgust: transfer alone takes it from 17.7 to 31.5; context alone also helps. Fear is the interesting one: 18.1, 18.3, 18.1, and then 26.1 only for the full model. Neither factor moves fear alone. And these are recall gains: the baseline was not confusing fear with something else, it was simply not predicting it.</aside>
+</section>
+
+<section class="slide" id="s-examples" data-steps="2" aria-label="Error analysis">
+  <h2>What each switch fixes, on real test turns</h2>
+  <div class="ex" style="left:96px">
+    <div class="bubble"><small>previous turn</small>“It was just so awkward and bumpy.”</div>
+    <div class="bubble t"><small>Ross · gold: surprise</small>“Bumpy?”</div>
+    <div class="guess" data-at="1">without context <s>neutral</s></div>
+    <div class="guess" data-at="1">with context <span class="pill" style="--c:var(--surprise)">surprise</span></div>
+  </div>
+  <div class="ex" style="left:840px">
+    <div class="bubble"><small>previous turn</small>“Oh my God! I overslept!”</div>
+    <div class="bubble t"><small>Monica · gold: disgust</small>“Oh wait, Joey, you can’t go like that! You stink!”</div>
+    <div class="guess" data-at="2">without transfer <s>anger</s></div>
+    <div class="guess" data-at="2">with transfer <span class="pill" style="--c:var(--disgust)">disgust</span></div>
+  </div>
+  <aside>Two turns from the error-analysis output. Left: M2 has no context and calls it neutral; M4 reads the previous turn and gets surprise. Right: M3 has the context and still reaches for anger, the frequent neighbour of disgust; M4 learned disgust from GoEmotions and uses it. Context can also mislead on dialogue-opening turns, and when every system fails the usual wrong answer is neutral.</aside>
+</section>
+
+<section class="slide" id="s-variance" data-steps="2" aria-label="Variance and ensembling">
+  <h2>The same model, seven seeds</h2>
+  <div class="track">
+    <span class="tick" style="left:0">45</span><span class="tick" style="left:260px">46</span><span class="tick" style="left:520px">47</span><span class="tick" style="left:780px">48</span><span class="tick" style="left:1040px">49</span><span class="tick" style="left:1300px">50</span>
+    <div class="mean"><p class="muted">one M₄ run</p><p class="big num"><b>47.3 ± 0.9</b></p></div>
+    <i class="run" style="--x:944px;--n:0"></i><i class="run" style="--x:663px;--n:1"></i><i class="run" style="--x:460px;--n:2"></i><i class="run" style="--x:663px;--n:3"></i><i class="run" style="--x:738px;--n:4"></i><i class="run" style="--x:161px;--n:5"></i><i class="run" style="--x:551px;--n:6"></i>
+    <div class="ens" data-at="1"><p class="muted">average the probabilities of 17 runs</p><p class="v num">49.5</p></div>
+  </div>
+  <div class="nulls" data-at="2">
+    <div><b>Decision offsets</b><p>Better on dev 10 of 10 times, worse on test 9 of 10.</p></div>
+    <div><b>Speaker embeddings</b><p>−0.50 against M₄ over seven paired seeds.</p></div>
+    <div><b>Fine-grained labels as input</b><p>−0.08 against M₄. The encoder already carries it.</p></div>
+  </div>
+  <aside>Each dot is one training run of the full model, same code, different seed: 45.6 to 48.6 test macro-F1. That spread is wider than the plus 1.85 we got from transfer. Click: average the predicted probabilities of 17 runs and you get 49.5, plus 2.2 over a single run and more than any architectural change, with accuracy up to 65.9. Click: three things we tried that did not help. Offsets overfit dev; speaker embeddings and explicit fine-grained inputs do nothing.</aside>
+</section>
+
+<section class="slide" id="s-end" data-steps="4" aria-label="Conclusions">
+  <h2>What we learned</h2>
+  <div class="points">
+    <div data-at="1"><i style="--c:var(--sadness)"></i><p>Transfer and context both help, and they add up.<span>+1.85 and +1.15 alone, +2.49 together, positive in every seed.</span></p></div>
+    <div data-at="2"><i style="--c:var(--fear)"></i><p>The gains are rare emotions the baseline never predicted.<span>Disgust from transfer; fear only from both.</span></p></div>
+    <div data-at="3"><i style="--c:var(--surprise)"></i><p>What transfers is the encoder, not its labels.</p></div>
+    <div data-at="4"><i style="--c:var(--joy)"></i><p>Seed variance is bigger than either effect.<span>Next: more seeds with a paired test, and a second corpus, before any new architecture.</span></p></div>
+  </div>
+  <aside>One click per point. Limits to say out loud: one dataset, text only, three seeds for most systems, no significance test. Likely questions. Accuracy is flat because neutral is 48 percent and already near 78 to 80 F1. Reproducibility: all 52 runs were retrained from scratch on the same Kaggle setup with one command and matched the reported metrics and predictions exactly. Tuning: a 15-variant sweep on M4 found nothing better than the default recipe on dev.</aside>
+</section>
+
+<section class="slide" id="s-questions" aria-label="Questions">
+  <div class="bubble qa">Questions?</div>
+  <p class="big thanks">Thank you. <span class="muted">Code, runs and report reproduce with one command each.</span></p>
+  <div class="spectrum" aria-hidden="true">
+    <i style="--c:var(--neutral);--n:0;flex:1256"></i><i style="--c:var(--joy);--n:1;flex:402"></i><i style="--c:var(--anger);--n:2;flex:345"></i><i style="--c:var(--surprise);--n:3;flex:281"></i><i style="--c:var(--sadness);--n:4;flex:208"></i><i style="--c:var(--disgust);--n:5;flex:68"></i><i style="--c:var(--fear);--n:6;flex:50"></i>
+  </div>
+  <p class="byline">Sainadth Pagadala <span class="muted">· COSC 6341, Fall 2026</span></p>
+  <aside>Likely questions. Why is accuracy flat: neutral is 48 percent of the test set and every system already scores 78 to 80 F1 on it. Is plus 1.85 significant: we claim direction only, positive in 3 of 3 seeds. Why exclude neutral in Stage I: the specification requires it and MELD has its own neutral. GoEmotions is multi-label: we keep examples with exactly one non-neutral label. Why 24 turns: memory; longer dialogues are split into windows that never cross a dialogue. Why is macro-F1 under 50: fear and disgust have 50 and 68 test utterances; weighted-F1 for the ensemble is 65.1. Tuning: a 15-variant sweep on M4 found nothing better than the default recipe on dev. Reproducibility: all 52 runs retrained from scratch with one command matched the reported metrics exactly.</aside>
+</section>
+
+</main>
+<div id="bar"></div>
+<div id="hint">← → or click · N for notes</div>
+<div id="notes"></div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const still = new URLSearchParams(location.search).has('still');
+if (still) document.body.classList.add('still');
+let i = 0, s = 0;
+
+// 2,610 dots in the order of the class counts, so the grid reads as a proportion.
+const classes = [['neutral', 1256, 1], ['joy', 402, 1], ['anger', 345, 1], ['surprise', 281, 1], ['sadness', 208, 1], ['disgust', 68, 0], ['fear', 50, 0]];
+const dots = document.getElementById('dots');
+let k = 0;
+for (const [name, count, common] of classes)
+  for (let n = 0; n < count; n++, k++) {
+    const dot = document.createElement('i');
+    dot.style.cssText = `--c:var(--${name});transition-delay:${Math.round(k * 0.45)}ms`;
+    if (common) dot.className = 'common';
+    dots.append(dot);
+  }
+
+function count(el) {
+  const to = +el.dataset.count, from = +(el.dataset.from ?? 0), digits = (el.dataset.count.split('.')[1] || '').length;
+  const format = v => digits ? v.toFixed(digits) : Math.round(v).toLocaleString('en-US');
+  if (still || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = format(to); return; }
+  const start = performance.now();
+  (function tick(now) {
+    const t = Math.min(1, (now - start) / 900), eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = format(from + (to - from) * eased);
+    if (t < 1) requestAnimationFrame(tick);
+  })(start);
+}
+
+function render() {
+  slides.forEach((el, n) => {
+    const on = n === i;
+    el.classList.toggle('active', on);
+    for (let step = 1; step <= 6; step++) el.classList.toggle('st' + step, on && s >= step);
+    el.querySelectorAll('[data-at]').forEach(node => {
+      const show = on && s >= +node.dataset.at, was = node.classList.contains('on');
+      node.classList.toggle('on', show);
+      if (show && !was) node.querySelectorAll('[data-count]').forEach(count);
+    });
+  });
+  document.getElementById('bar').style.width = ((i + 1) / slides.length * 100) + '%';
+  document.getElementById('notes').textContent = slides[i].querySelector('aside')?.textContent ?? '';
+  history.replaceState(null, '', `#${i + 1}.${s}`);
+}
+const steps = () => +(slides[i].dataset.steps || 0);
+function next() { if (s < steps()) s++; else if (i < slides.length - 1) { i++; s = 0; } render(); }
+function prev() { if (s > 0) s--; else if (i > 0) { i--; s = steps(); } render(); }
+
+addEventListener('keydown', e => {
+  if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) { e.preventDefault(); next(); }
+  else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); prev(); }
+  else if (e.key.toLowerCase() === 'n') document.getElementById('notes').classList.toggle('show');
+  else if (e.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
+});
+addEventListener('click', e => (e.clientX < innerWidth * 0.25 ? prev() : next()));
+let touch = null;
+addEventListener('touchstart', e => (touch = e.touches[0].clientX), { passive: true });
+addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - touch; if (Math.abs(dx) > 40) (dx < 0 ? next() : prev()); });
+
+function fit() {
+  const scale = Math.min(innerWidth / 1600, innerHeight / 900);
+  document.getElementById('stage').style.transform = `scale(${scale}) translate(-50%, -50%)`;
+}
+addEventListener('resize', fit);
+fit();
+const [a, b] = location.hash.slice(1).split('.').map(Number);
+if (a >= 1 && a <= slides.length) { i = a - 1; s = Math.min(b || 0, steps()); }
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+\begin{table}[t]
+\centering
+\caption{Stage-II recipe sweep for $M_4$ (seed 42), ordered by dev macro-F1. Selection is on dev; test is shown for the record. No variant beats the default recipe (\texttt{base}) by more than the seed spread.}
+\label{tab:sweep}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Variant & Dev mF1 & Test mF1 & Test acc. \\
+\midrule
+head\_lr3e4 & 49.17 & 45.93 & 63.03 \\
+\textbf{base} & 48.58 & 48.63 & 63.98 \\
+focal1 & 48.53 & 46.54 & 62.34 \\
+backbone\_lr2e5 & 47.76 & 45.80 & 63.37 \\
+speaker & 47.69 & 46.55 & 64.14 \\
+stage1\_first & 47.69 & 48.39 & 63.91 \\
+ute4 & 46.95 & 47.06 & 63.49 \\
+long\_focal & 46.89 & 45.91 & 62.68 \\
+focal2 & 46.81 & 45.91 & 61.95 \\
+long & 46.47 & 46.34 & 61.30 \\
+smooth & 46.46 & 47.79 & 64.14 \\
+long\_focal\_speaker & 46.23 & 45.73 & 61.84 \\
+weighted\_ce & 45.12 & 43.88 & 56.74 \\
+long\_weighted & 44.38 & 45.47 & 59.39 \\
+focal2\_weighted & 44.04 & 42.58 & 55.25 \\
+\bottomrule
+\end{tabular}
+\end{table}

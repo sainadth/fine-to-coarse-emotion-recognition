@@ -1,0 +1,231 @@
+{
+  "stage": "II",
+  "system": "M5",
+  "config": {
+    "run_name": "v2sp_M5_s1",
+    "system": "M5",
+    "base_model": "roberta-base",
+    "from_stage1": "checkpoints/v2_stage1_s1",
+    "use_ute": true,
+    "view": "dialogue",
+    "seed": 1,
+    "epochs": 6,
+    "batch_size": 4,
+    "eval_batch_size": 8,
+    "learning_rate": 1e-05,
+    "head_learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "max_length": 64,
+    "max_turns": 24,
+    "dropout": 0.1,
+    "ute_layers": 2,
+    "ute_heads": 8,
+    "ute_ff": 2048,
+    "ute_dropout": 0.1,
+    "freeze_backbone": false,
+    "use_fine_logits": true,
+    "speaker_aware": false,
+    "speaker_prefix": true,
+    "class_weighted_loss": false,
+    "loss": "ce",
+    "focal_gamma": 2.0,
+    "label_smoothing": 0.0,
+    "grad_clip": 1.0,
+    "device": "auto",
+    "num_workers": 2,
+    "limit": null,
+    "amp": true,
+    "extras": {}
+  },
+  "goemotions_transfer": true,
+  "ute": true,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.3128794641448902,
+      "dev": {
+        "accuracy": 0.5906221821460775,
+        "macro_f1": 0.41147565454521795,
+        "weighted_f1": 0.567905622394499
+      },
+      "seconds": 46.24120283126831
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.113087321474002,
+      "dev": {
+        "accuracy": 0.6275924256086565,
+        "macro_f1": 0.44608876394663793,
+        "weighted_f1": 0.6082816974083598
+      },
+      "seconds": 45.42764377593994
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.9662998957129625,
+      "dev": {
+        "accuracy": 0.6293958521190262,
+        "macro_f1": 0.46661287631236675,
+        "weighted_f1": 0.6157940365440836
+      },
+      "seconds": 46.035534381866455
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.8660881530780059,
+      "dev": {
+        "accuracy": 0.6014427412082958,
+        "macro_f1": 0.4323084844391093,
+        "weighted_f1": 0.5922756590139434
+      },
+      "seconds": 45.48036479949951
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.759422872788631,
+      "dev": {
+        "accuracy": 0.6393146979260595,
+        "macro_f1": 0.4522971706881317,
+        "weighted_f1": 0.6177381316602798
+      },
+      "seconds": 45.59507894515991
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.6860654099629475,
+      "dev": {
+        "accuracy": 0.6212804328223624,
+        "macro_f1": 0.44788417926088997,
+        "weighted_f1": 0.6088476400472146
+      },
+      "seconds": 45.565325021743774
+    }
+  ],
+  "best_dev_macro_f1": 0.46661287631236675,
+  "test": {
+    "accuracy": 0.6348659003831417,
+    "macro_f1": 0.4592203760288131,
+    "weighted_f1": 0.6261381815092225,
+    "per_class": {
+      "anger": {
+        "precision": 0.5149253731343284,
+        "recall": 0.4,
+        "f1": 0.45024469820554647,
+        "support": 345
+      },
+      "disgust": {
+        "precision": 0.46153846153846156,
+        "recall": 0.17647058823529413,
+        "f1": 0.2553191489361702,
+        "support": 68
+      },
+      "fear": {
+        "precision": 0.28125,
+        "recall": 0.18,
+        "f1": 0.21951219512195122,
+        "support": 50
+      },
+      "joy": {
+        "precision": 0.5609756097560976,
+        "recall": 0.6293532338308457,
+        "f1": 0.593200468933177,
+        "support": 402
+      },
+      "neutral": {
+        "precision": 0.7725856697819314,
+        "recall": 0.7898089171974523,
+        "f1": 0.7811023622047244,
+        "support": 1256
+      },
+      "sadness": {
+        "precision": 0.41935483870967744,
+        "recall": 0.3125,
+        "f1": 0.3581267217630854,
+        "support": 208
+      },
+      "surprise": {
+        "precision": 0.47715736040609136,
+        "recall": 0.6690391459074733,
+        "f1": 0.557037037037037,
+        "support": 281
+      }
+    },
+    "confusion_matrix": [
+      [
+        138,
+        5,
+        8,
+        49,
+        72,
+        20,
+        53
+      ],
+      [
+        14,
+        12,
+        2,
+        3,
+        22,
+        6,
+        9
+      ],
+      [
+        4,
+        1,
+        9,
+        5,
+        14,
+        6,
+        11
+      ],
+      [
+        19,
+        2,
+        2,
+        253,
+        68,
+        10,
+        48
+      ],
+      [
+        40,
+        5,
+        7,
+        99,
+        992,
+        42,
+        71
+      ],
+      [
+        24,
+        1,
+        3,
+        21,
+        80,
+        65,
+        14
+      ],
+      [
+        29,
+        0,
+        1,
+        21,
+        36,
+        6,
+        188
+      ]
+    ],
+    "labels": [
+      "anger",
+      "disgust",
+      "fear",
+      "joy",
+      "neutral",
+      "sadness",
+      "surprise"
+    ],
+    "n_examples": 2610
+  },
+  "checkpoint": "/kaggle/working/checkpoints/v2sp_M5_s1"
+}

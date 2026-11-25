@@ -1,0 +1,657 @@
+%% ACM sigconf: two-column research report (nonacm). Build: tectonic report.tex
+\documentclass[sigconf,nonacm]{acmart}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[english]{babel}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{xurl}
+\usepackage{balance}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+% Same hues as scripts/make_figures.py, so diagram and plots read as one system.
+\definecolor{f2cblue}{HTML}{2A78D6}
+\definecolor{f2corange}{HTML}{EB6834}
+\definecolor{f2caqua}{HTML}{1BAF7A}
+\definecolor{f2cyellow}{HTML}{EDA100}
+
+% Let long \texttt{} tokens and inline math break instead of bleeding across the column rule.
+\sloppy
+\emergencystretch=3em
+\hfuzz=2pt
+
+% Course submission: no permission footnote
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\settopmatter{printacmref=false,printfolios=true}
+
+% --- title & authors ---
+\title[Fine-to-Coarse Sequential Emotion Recognition]{Fine-to-Coarse Sequential Emotion Recognition with Hierarchical Transformer Models}
+
+\author{Sainadth Pagadala}
+\email{spagadala1@islander.tamucc.edu}
+\affiliation{%
+  \department{College of Engineering and Computer Science}
+  \institution{Texas A\&M University--Corpus Christi}
+  \city{Corpus Christi}
+  \state{TX}
+  \postcode{78412}
+  \country{USA}}
+\author{Minhua Huang}
+\authornote{Course instructor and project advisor.}
+\affiliation{%
+  \department{College of Engineering and Computer Science}
+  \institution{Texas A\&M University--Corpus Christi}
+  \city{Corpus Christi}
+  \state{TX}
+  \postcode{78412}
+  \country{USA}}
+\renewcommand{\shortauthors}{Pagadala and Huang}
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+  <concept_id>10010147.10010178.10010179</concept_id>
+  <concept_desc>Computing methodologies~Natural language processing</concept_desc>
+  <concept_significance>500</concept_significance>
+</concept>
+<concept>
+  <concept_id>10010147.10010257.10010293.10010294</concept_id>
+  <concept_desc>Computing methodologies~Neural networks</concept_desc>
+  <concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+\ccsdesc[500]{Computing methodologies~Natural language processing}
+\ccsdesc[300]{Computing methodologies~Neural networks}
+
+\keywords{emotion recognition in conversation, transfer learning, GoEmotions, MELD, RoBERTa, hierarchical Transformer}
+
+\begin{document}
+\begin{abstract}
+We ask whether fine-grained emotion knowledge transfers to coarse-grained sequential
+emotion recognition in dialogue. A RoBERTa-base encoder is first fine-tuned on GoEmotions
+over 27 fine-grained categories; its 27-class head is then discarded and the backbone is
+transferred to MELD, where an utterance-level Transformer encoder (UTE) models
+dependencies across dialogue turns before a new 7-class classifier predicts the emotion of
+each utterance. Four systems isolate the two factors: transfer ($M_2$), sequential context
+($M_3$), and both together ($M_4$), against a plain RoBERTa-base baseline ($M_1$). Over
+three seeds, transfer adds $1.85$ macro-F1 points, sequential context adds $1.15$, and the
+two effects add up: $M_4$ reaches $0.4765$ macro-F1 against $0.4516$ for $M_1$, and it
+beats $M_1$ in every seed. The gains concentrate in the rare
+\texttt{disgust} and \texttt{fear} categories and come at a small cost in overall accuracy,
+which is dominated by the \texttt{neutral} majority class. Feeding the explicit
+fine-grained distribution into the UTE as well gives no further macro-F1 gain. What carries
+over from GoEmotions is the encoder representation, not its label predictions. Finally,
+averaging predicted probabilities over seeds raises test macro-F1 to $0.4952$, a
+$2.2$-point gain over a single $M_4$ run that exceeds either architectural effect and,
+unlike them, improves accuracy as well, which indicates that a sizeable part of the
+remaining gap is variance rather than model capacity. Speaker embeddings and per-class
+decision offsets, tested the same way, do not help.
+\end{abstract}
+\maketitle
+
+\section{Introduction and Motivation}
+Emotion recognition in conversation differs from sentence-level emotion classification in
+two ways. First, the label set used in practice is coarse: MELD annotates each utterance
+with one of seven emotions, several of which are rare. Second, an utterance is not
+independent of what precedes it. \emph{``What?''} is neutral after a plain statement and
+surprised after an exclamation, and no model that sees the utterance alone can tell the
+difference.
+
+Each problem points to its own fix. A coarse label set limits how much a model can learn
+about emotion from the target corpus alone, so that knowledge may be easier to get from
+another corpus. GoEmotions labels 58k Reddit comments with 27 fine-grained categories,
+against MELD's seven. The context problem calls for a model that reads the whole sequence
+of utterances instead of one utterance at a time.
+
+This project combines the two. Stage~I fine-tunes RoBERTa-base on the 27 fine-grained
+GoEmotions categories and then discards the classification head, keeping only the encoder
+parameters $\theta_G$. Stage~II transfers that encoder to MELD, adds turn-level positional
+information and an utterance-level Transformer encoder over the dialogue, and trains a new
+7-class classifier. We want to know whether the two parts help independently or whether
+one makes the other redundant:
+
+\begin{quote}
+Does fine-grained emotion learning on GoEmotions improve coarse-grained sequential emotion
+recognition on MELD when dialogue context is modelled by an utterance-level Transformer?
+\end{quote}
+
+The contributions are: (i) a two-stage fine-to-coarse training pipeline in which the
+transferred backbone keeps training instead of being frozen; (ii) a factorial
+comparison of four systems that separates the transfer effect from the sequential-context
+effect; (iii) a seed-repeated evaluation with per-class analysis showing where each effect
+acts; and (iv) a negative result for an extension that injects the explicit fine-grained
+distribution into the sequence model.
+
+\section{Related Work}
+\paragraph{Pretrained Transformers for emotion classification.}
+Transformer encoders pretrained with masked language modelling \citep{devlin2019bert,
+liu2019roberta} are the standard starting point for text emotion classification: the
+encoder supplies a contextual sentence representation and a small classification head is
+fine-tuned on the target labels. We follow the same recipe in Stage~I, with RoBERTa-base
+as the encoder.
+
+\paragraph{Fine-grained emotion resources.}
+GoEmotions \citep{demszky2020goemotions} annotates 58k Reddit comments with 27 emotion
+categories plus \texttt{neutral}, and is multi-label. Its taxonomy is considerably finer
+than the coarse six- or seven-way schemes used in most conversational corpora, which makes
+it an obvious candidate for transfer to a coarse task. The macro-F1 figures in the original
+GoEmotions paper are for the multi-label 28-class task, so they are not comparable to the single-label 27-class setting used
+here.
+
+\paragraph{Emotion recognition in conversation.}
+MELD \citep{poria2019meld} provides multi-party dialogues from a television series with
+seven coarse emotion labels per utterance, and is strongly imbalanced towards
+\texttt{neutral}. Most work on this corpus models the conversation in some form, for
+example with recurrent networks over turns or with graph networks over speakers and turns
+\citep{ghosal2019dialoguegcn}. We use the
+simplest context model that fits the project specification: a standard Transformer encoder
+\citep{vaswani2017attention} applied at the utterance level, with learned turn-level
+positional embeddings.
+
+\paragraph{Positioning.}
+Transfer from a fine-grained emotion corpus and explicit dialogue-context modelling are
+usually studied separately. Our four-system design tests them together. The $M_3$ versus
+$M_4$ comparison is the one that matters most: it asks whether the transferred encoder
+still helps once the model can already see the conversation.
+
+\section{Methodology}
+
+\subsection{Stage I: fine-grained emotion learning}
+RoBERTa-base is fine-tuned on GoEmotions over 27 fine-grained categories with the
+\texttt{neutral} category excluded:
+\[
+x \xrightarrow{\text{RoBERTa}} h \xrightarrow{W_{27}} p(y^f \mid x),
+\qquad
+\mathcal{L}_f = -\sum_{k=1}^{27} y^f_k \log p(y^f_k \mid x).
+\]
+GoEmotions is multi-label while Stage~I is a single-label cross-entropy classifier, so
+each example is reduced to one label: the \texttt{neutral} category is removed, and only
+examples carrying exactly one remaining label are kept. This drops 12{,}823 neutral-only
+and 5{,}767 multi-label training examples, leaving 24{,}820 / 3{,}122 / 3{,}154 examples
+for train / validation / test over the 27 fine-grained categories. After training,
+$W_{27}$ is discarded and the backbone parameters $\theta_G$ are retained.
+
+\subsection{Stage II: sequential coarse emotion learning on MELD}
+A dialogue is $D = (U_1, \dots, U_T)$. Each utterance is encoded by the shared
+GoEmotions-trained backbone, $U_t \rightarrow h_t \in \mathbb{R}^{768}$. Turn-level
+positional embeddings preserve order, $\widetilde{h}_t = h_t + p_t$, and the
+utterance-level Transformer encoder contextualises the dialogue,
+$(z_1, \dots, z_T) = \mathrm{UTE}(\widetilde{h}_1, \dots, \widetilde{h}_T)$, followed by
+$p(y^c_t \mid D) = \mathrm{softmax}(W_7 z_t + b_7)$. The parameters
+$\theta_G$, $\theta_{\mathrm{UTE}}$ and $W_7$ are all trainable in Stage~II, so Stage~II
+keeps fine-tuning the encoder; it is not used as a frozen feature extractor.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=8mm,
+  box/.style={draw, rounded corners, minimum height=8mm, minimum width=20mm, font=\small},
+  small/.style={font=\scriptsize},
+  arrow/.style={-{Latex[length=2mm]}}
+]
+\node[box, fill=black!4] (u1) {$U_1$};
+\node[box, fill=black!4, right=of u1] (u2) {$U_2$};
+\node[box, fill=black!4, right=of u2] (ut) {$U_T$};
+\node[small, right=2mm of u2] {$\cdots$};
+
+\node[box, draw=f2cblue, fill=f2cblue!18, below=10mm of u2, minimum width=70mm] (rob)
+  {RoBERTa$_G$ \; (shared, $\theta_G$ from Stage I)};
+
+\node[box, draw=f2cyellow, fill=f2cyellow!18, below=8mm of rob, minimum width=70mm] (pos)
+  {$\widetilde{h}_t = h_t + p_t$ \quad (turn-level positional embeddings)};
+
+\node[box, draw=f2corange, fill=f2corange!18, below=8mm of pos, minimum width=70mm] (ute)
+  {Utterance-Level Transformer Encoder (UTE)};
+
+\node[box, draw=f2caqua, fill=f2caqua!18, below=10mm of ute] (w7) {$W_7$};
+\node[box, fill=black!4, below=8mm of w7] (out) {MELD emotion $y^c_t$};
+
+\draw[arrow] (u1) -- (u1 |- rob.north);
+\draw[arrow] (u2) -- (u2 |- rob.north);
+\draw[arrow] (ut) -- (ut |- rob.north);
+\draw[arrow] (rob) -- node[right, small] {$h_t$} (pos);
+\draw[arrow] (pos) -- (ute);
+\draw[arrow] (ute) -- node[right, small] {$z_t$} (w7);
+\draw[arrow] (w7) -- (out);
+\end{tikzpicture}
+\caption{Stage-II architecture. Blue: the shared encoder, transferred from Stage~I in
+M$_2$ and M$_4$. Yellow: turn positions. Orange: the UTE. Green: the new 7-class head.
+Systems M$_1$ and M$_2$ remove the UTE block and classify
+each utterance independently; systems M$_1$ and M$_3$ start from RoBERTa-base instead of
+RoBERTa$_G$.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Research extension}
+The transfer in $M_4$ is implicit: only the encoder parameters cross between stages, and
+the fine-grained predictions themselves are thrown away. The extension tests whether making
+them explicit helps. The Stage-I head is retained as a \emph{frozen} predictor, producing a
+fine-grained distribution $p^f_t \in \mathbb{R}^{27}$ for every utterance. This is
+concatenated with the utterance representation,
+\[
+e_t = [h_t ; p^f_t] \in \mathbb{R}^{768 + 27},
+\]
+linearly projected back to $\mathbb{R}^{768}$, and the resulting sequence is processed by
+the UTE exactly as before. Only the projection is newly introduced; the rest of the
+architecture is identical to $M_4$, so any difference is attributable to the explicit
+fine-grained signal.
+
+\section{Experimental Design}
+
+\subsection{Datasets and preprocessing}
+GoEmotions contributes 24{,}820 / 3{,}122 / 3{,}154 single-label examples over 27
+categories (Section~3.1). MELD contributes 9{,}989 / 1{,}109 / 2{,}610 utterances grouped
+into 1{,}038 / 114 / 281 dialogue windows, over seven coarse categories. The class
+distribution is heavily skewed: in the training split \texttt{neutral} accounts for 4{,}710
+utterances (47.1\%) against 271 for \texttt{disgust} (2.7\%) and 268 for \texttt{fear}
+(2.7\%). Dialogue boundaries and utterance order are preserved; dialogues longer than
+$T_{\max} = 24$ turns are split into consecutive non-overlapping windows, so every turn is
+used and no window spans two dialogues. Utterances are tokenised to at most 64 word pieces.
+
+\subsection{Systems}
+\begin{align*}
+M_1 &: \mathrm{RoBERTa}_{base} \rightarrow \mathrm{MELD},\\
+M_2 &: \mathrm{RoBERTa}_G \rightarrow \mathrm{MELD},\\
+M_3 &: \mathrm{RoBERTa}_{base} + \mathrm{UTE} \rightarrow \mathrm{MELD},\\
+M_4 &: \mathrm{RoBERTa}_G + \mathrm{UTE} \rightarrow \mathrm{MELD}.
+\end{align*}
+
+\begin{table}[t]
+\centering
+\caption{Stage-II recipe sweep for $M_4$ (seed 42), ordered by dev macro-F1. Selection is on dev; test is shown for the record. No variant beats the default recipe (\texttt{base}) by more than the seed spread.}
+\label{tab:sweep}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Variant & Dev mF1 & Test mF1 & Test acc. \\
+\midrule
+head\_lr3e4 & 49.17 & 45.93 & 63.03 \\
+\textbf{base} & 48.58 & 48.63 & 63.98 \\
+focal1 & 48.53 & 46.54 & 62.34 \\
+backbone\_lr2e5 & 47.76 & 45.80 & 63.37 \\
+speaker & 47.69 & 46.55 & 64.14 \\
+stage1\_first & 47.69 & 48.39 & 63.91 \\
+ute4 & 46.95 & 47.06 & 63.49 \\
+long\_focal & 46.89 & 45.91 & 62.68 \\
+focal2 & 46.81 & 45.91 & 61.95 \\
+long & 46.47 & 46.34 & 61.30 \\
+smooth & 46.46 & 47.79 & 64.14 \\
+long\_focal\_speaker & 46.23 & 45.73 & 61.84 \\
+weighted\_ce & 45.12 & 43.88 & 56.74 \\
+long\_weighted & 44.38 & 45.47 & 59.39 \\
+focal2\_weighted & 44.04 & 42.58 & 55.25 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Hyperparameters and protocol}
+All systems use AdamW with linear warmup and decay, gradient clipping at 1.0, dropout 0.1,
+and weight decay 0.01. Stage~I trains for 4 epochs at learning rate $2\times10^{-5}$ with
+batch size 32. Stage~II uses a lower rate for the pretrained backbone
+($1\times10^{-5}$) than for the newly initialised UTE and classifier
+($1\times10^{-4}$): $M_1$ and $M_2$ train for 5 epochs over batches of 32 utterances,
+$M_3$ and $M_4$ for 6 epochs over batches of 4 dialogues. The UTE has 2 layers, 8 heads,
+feed-forward width 2048, and learned turn-level positional embeddings. Mixed precision is
+used on CUDA only. Every configuration is stored with its run in
+\texttt{results/<run>/metrics.json}. Checkpoint selection is by validation (dev) macro-F1;
+the test set is used exactly once per system, for the reported numbers. Each system is
+trained under three seeds ($42$, $1$, $2$) and results are reported as mean $\pm$ standard
+deviation. Every seed also retrains its own Stage-I backbone, so the transfer systems
+$M_2$ and $M_4$ each start from the $\theta_G$ trained with their own seed instead of a
+shared one. This keeps the variance of the transfer arm comparable to that of the baseline arm.
+
+\subsection{Evaluation metrics}
+Accuracy, macro-F1 and weighted-F1, with per-class precision, recall and F1. MELD is
+class-imbalanced, so macro-F1 is the primary metric.
+
+\section{Results and Analysis}
+\begin{table*}[t]
+\centering
+\caption{MELD test results for the required systems (\%). Mean $\pm$ standard deviation over 3 seeds.}
+\label{tab:main}
+\begin{tabular}{lccrccc}
+\toprule
+Model & GoEmotions & UTE & Runs & Accuracy & Macro-F1 & Weighted-F1 \\
+\midrule
+$M_1$ & No & No & 3 & \textbf{65.10 $\pm$ 0.20} & 45.16 $\pm$ 0.34 & 63.74 $\pm$ 0.22 \\
+$M_2$ & Yes & No & 3 & 64.96 $\pm$ 0.39 & 47.01 $\pm$ 0.99 & 63.75 $\pm$ 0.46 \\
+$M_3$ & No & Yes & 3 & 63.84 $\pm$ 0.25 & 46.31 $\pm$ 0.50 & 63.31 $\pm$ 0.16 \\
+$M_4$ & Yes & Yes & 3 & 64.25 $\pm$ 1.00 & \textbf{47.65 $\pm$ 0.93} & 63.48 $\pm$ 0.29 \\
+ext. & Yes & Yes & 3 & 64.53 $\pm$ 0.29 & 47.57 $\pm$ 0.31 & \textbf{63.92 $\pm$ 0.23} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Stage~I reaches $0.5825 \pm 0.0076$ macro-F1 and $0.6574$ accuracy on the GoEmotions test
+split under the 27-class single-label reduction described in Section~3.1.
+
+Table~\ref{tab:main} reports the Stage-II results. Because the differences between systems
+are of the same order as the spread across seeds, we also compute \emph{paired} per-seed
+differences, in which each system is compared against another system trained with the same
+seed; this cancels the shared seed effect and is the more informative view.
+
+\begin{table*}[t]
+\centering
+\caption{Paired per-seed differences in MELD test macro-F1 (points). Each column is one
+seed; a comparison is meaningful only if its sign is stable across all three.}
+\label{tab:paired}
+\begin{tabular}{llrrrr}
+\toprule
+Comparison & Effect & $s{=}42$ & $s{=}1$ & $s{=}2$ & Mean \\
+\midrule
+$M_1 \rightarrow M_2$ & fine-grained transfer            & $+1.53$ & $+2.63$ & $+1.38$ & $+1.85$ \\
+$M_1 \rightarrow M_3$ & sequential context               & $+1.19$ & $+1.29$ & $+0.97$ & $+1.15$ \\
+$M_3 \rightarrow M_4$ & transfer given context           & $+2.25$ & $+0.77$ & $+0.99$ & $+1.34$ \\
+$M_1 \rightarrow M_4$ & both                             & $+3.44$ & $+2.07$ & $+1.96$ & $+2.49$ \\
+\midrule
+$M_4 \rightarrow$ ext. & explicit $p^f_t$                & $-1.28$ & $+0.37$ & $+0.66$ & $-0.08$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\caption{Per-class precision, recall and F1 on the MELD test split (\%), mean over three seeds.}
+\label{tab:perclass}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Emotion & \multicolumn{3}{c}{$M_1$} & \multicolumn{3}{c}{$M_4$} & Support \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+ & P & R & F1 & P & R & F1 & \\
+\midrule
+anger & 54.9 & 42.7 & 48.0 & 51.9 & 44.3 & 47.7 & 345 \\
+disgust & 27.6 & 13.2 & 17.7 & 41.3 & 22.1 & 28.4 & 68 \\
+fear & 28.5 & 13.3 & 18.1 & 25.9 & 26.7 & 26.1 & 50 \\
+joy & 57.5 & 62.5 & 59.9 & 59.9 & 61.0 & 60.4 & 402 \\
+neutral & 76.7 & 83.1 & 79.8 & 76.6 & 80.3 & 78.3 & 1256 \\
+sadness & 45.3 & 30.0 & 36.0 & 48.3 & 31.2 & 37.1 & 208 \\
+surprise & 51.2 & 63.5 & 56.7 & 49.6 & 63.1 & 55.5 & 281 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[t]
+\centering
+\caption{Per-class F1 on the MELD test split (\%), mean over three seeds. Bold marks the best system for each emotion.}
+\label{tab:perclassf1}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Emotion & $M_1$ & $M_2$ & $M_3$ & $M_4$ & ext. & Support \\
+\midrule
+anger & 48.0 & 46.5 & 47.9 & 47.7 & \textbf{50.1} & 345 \\
+disgust & 17.7 & \textbf{31.5} & 25.7 & 28.4 & 27.4 & 68 \\
+fear & 18.1 & 18.3 & 18.1 & \textbf{26.1} & 21.4 & 50 \\
+joy & 59.9 & 60.9 & 59.5 & 60.4 & \textbf{62.0} & 402 \\
+neutral & \textbf{79.8} & 79.2 & 78.3 & 78.3 & 78.0 & 1256 \\
+sadness & 36.0 & 36.7 & \textbf{38.6} & 37.1 & 37.5 & 208 \\
+surprise & \textbf{56.7} & 56.0 & 56.0 & 55.5 & 56.5 & 281 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+Table~\ref{tab:perclass} separates precision from recall for the baseline and the full
+model. The gains on the rare classes are almost entirely gains in \emph{recall}:
+\texttt{fear} recall doubles from $13.3$ to $26.7$ while its precision falls slightly from
+$28.5$ to $25.9$, and \texttt{disgust} recall rises from $13.2$ to $22.1$ with precision
+improving as well, from $27.6$ to $41.3$. The baseline is not confusing these categories so
+much as declining to predict them at all; transfer and context make the model willing to
+use the labels.
+
+\paragraph{$M_1$ vs $M_2$: fine-grained transfer.}
+Transferring the GoEmotions-trained backbone improves macro-F1 by $1.85$ points, positive
+in all three seeds. Per class (Table~\ref{tab:perclassf1}), the effect is almost entirely
+one category: \texttt{disgust} improves by $13.8$ F1 points, from $17.7$ to $31.5$, while
+every other category moves by at most $1.5$ and \texttt{fear} does not move at all
+($+0.2$). MELD has only $271$ \texttt{disgust} training examples, too few to learn the
+category well, and GoEmotions fills part of that gap. It does not do the same for
+\texttt{fear} on its own, although MELD has just as few examples of it.
+
+\paragraph{$M_1$ vs $M_3$: sequential context.}
+Adding the UTE without transfer improves macro-F1 by $1.15$ points, again positive in every
+seed, with gains for \texttt{disgust} ($+8.0$ points) and \texttt{sadness} ($+2.6$);
+\texttt{fear} is again unchanged. Unlike transfer, context costs something on the
+frequent classes: \texttt{neutral} loses $1.5$ points and \texttt{surprise} $0.7$, and
+overall accuracy falls from $0.6510$ to $0.6384$. The sequence model redistributes
+probability mass away from the majority class, so macro-F1 rises while accuracy does not.
+
+\paragraph{$M_3$ vs $M_4$: does transfer still help once context is modelled?}
+Yes. Adding the transferred backbone on top of the UTE improves macro-F1 by a further
+$1.34$ points, positive in all three seeds, and it is here that \texttt{fear} finally
+moves: neither factor changed it alone, and together they raise it by $8.0$ points, from
+$18.1$ to $26.1$. Transfer and context are therefore not doing the same job. Together, $M_1 \rightarrow M_4$ gives $+2.49$ macro-F1,
+close to the sum of the two separate effects and positive in every seed.
+
+\paragraph{Extension: explicit fine-grained distribution.}
+Concatenating the frozen Stage-I distribution $p^f_t$ with the utterance representation
+does not improve macro-F1: the mean difference against $M_4$ is $-0.08$ points and the sign
+is not stable across seeds. The extension does achieve the best weighted-F1 of any system
+($0.6392$) and the smallest variance, so it trades minority-class recall for stability on
+the frequent classes. Our reading is that the useful part of Stage~I is the
+\emph{representation} it leaves in the encoder, not its label predictions.
+
+\subsection{Ensembling and post-hoc decision adjustment}
+\begin{table}[t]
+\centering
+\caption{Probability-averaged ensembles of Stage-II runs (\%). The ensemble is chosen by dev macro-F1; test is reported once for the chosen row.}
+\label{tab:ensemble}
+\begin{tabular}{lrrrr}
+\toprule
+Ensemble & Runs & Dev mF1 & Test mF1 & Test wF1 \\
+\midrule
+\textbf{v2:M2$+$M4$+$M5} & 17 & 48.95 & 49.52 & 65.11 \\
+v2:M4$+$M5 & 14 & 48.80 & 49.52 & 64.97 \\
+v2:M4 & 7 & 48.42 & 49.87 & 64.73 \\
+pooled:M4$+$M5 & 27 & 47.93 & 49.21 & 64.78 \\
+pooled:M2$+$M4$+$M5 & 33 & 47.56 & 49.13 & 65.01 \\
+v3spk:M4 & 7 & 47.56 & 48.75 & 64.61 \\
+v2sp:M4$+$M5 & 6 & 47.31 & 48.81 & 64.88 \\
+pooled:M4 & 17 & 47.24 & 49.16 & 64.77 \\
+v2:all5 & 23 & 47.18 & 48.15 & 64.96 \\
+v2sp:M2$+$M4$+$M5 & 9 & 47.06 & 49.12 & 65.08 \\
+v2sp:M4 & 3 & 46.71 & 49.29 & 64.38 \\
+v2sp:all5 & 15 & 46.12 & 48.64 & 65.07 \\
+pooled:all5 & 45 & 45.37 & 48.27 & 65.06 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The differences in Table~\ref{tab:main} are of the same order as the seed spread, which
+suggests that part of what separates the systems is variance rather than signal. We test
+this directly by averaging the predicted class probabilities of runs that differ only in
+seed, and of runs that differ in system. Candidate ensembles are scored on dev and the
+winner is evaluated on test exactly once, the same protocol used everywhere else in this
+work; Table~\ref{tab:ensemble} lists every candidate.
+
+For this experiment $M_4$ and the extension were trained on four further seeds, seven in
+all. Over seven seeds a single $M_4$ run averages $47.30 \pm 0.94$ test macro-F1, slightly
+below the three-seed figure in Table~\ref{tab:main}, which is itself a reminder of how much
+a three-seed mean moves.
+
+Dev selects the pool of $M_2$, $M_4$ and the extension, seventeen runs. On test it reaches
+$49.52$ macro-F1, $2.2$ points above the average single $M_4$ run --- larger than any single
+architectural effect we measured, including fine-grained transfer at $+1.85$. It also
+improves accuracy to $65.86$ and weighted-F1 to $65.11$. Per class, against the seven-seed
+$M_4$ mean: \texttt{disgust} $+5.0$, \texttt{anger} $+4.2$, \texttt{joy} $+2.8$,
+\texttt{surprise} $+1.9$, \texttt{neutral} $+1.3$, \texttt{sadness} $+1.2$, and
+\texttt{fear} $-0.8$. Six of seven classes improve, frequent ones included, which is what
+variance reduction predicts and what new information entering the model would not.
+
+The gain comes from averaging over seeds, not from mixing systems. Seven seeds of $M_4$
+alone reach $49.87$ on test, and the top three rows of Table~\ref{tab:ensemble} differ by
+half a point on dev and less on test; we cannot separate them. An earlier selection made
+with three seeds per system gave $49.83$, so the estimate is stable to about $0.3$ points
+as seeds are added, and adding seeds beyond three did not raise it. Pooling all five
+systems is clearly worse ($47.18$ dev, $48.15$ test for \texttt{v2:all5}): $M_1$ and
+$M_3$ contribute predictions that are weaker rather than merely different.
+
+\paragraph{A negative result: speaker embeddings.}
+Speaker-aware modelling adds a learned embedding of the relative speaker index to each
+utterance representation before the UTE, alongside the turn position. Trained on the same
+seven seeds and compared with $M_4$ seed by seed, it changes test macro-F1 by $-0.50$
+points on average (better in four seeds, worse in three; standard deviation $1.34$) and dev
+macro-F1 by $-0.42$. We also record a defect found on the way: the speaker embedding was
+originally left at the framework default initialisation, fifty times the scale of the
+positional embedding it is added next to, and the single sweep run in
+Table~\ref{tab:sweep} labelled \texttt{speaker} was made in that state. The seven-seed
+comparison uses the corrected initialisation, and the conclusion is the same either way:
+speaker identity, encoded like this, does not help on MELD.
+
+\paragraph{A negative result: per-class decision offsets.}
+We also fitted one additive offset per class on dev by coordinate ascent on dev macro-F1,
+a standard remedy for a skewed label prior. It does not transfer. Across the ten
+system-by-input-variant combinations the offsets raise dev macro-F1 in every case and lower
+\emph{test} macro-F1 in nine, by as much as $1.36$ points. With seven free parameters fitted
+on $1{,}109$ dev utterances, of which $25$ are \texttt{fear}, the offsets are fitting the dev
+sample rather than the label prior. We therefore report ensembling, which has no fitted
+parameters at all, and not offsets.
+
+\paragraph{Accuracy versus macro-F1.}
+Among the individually trained systems, accuracy is flat to slightly negative while macro-F1
+rises monotonically. This is expected: \texttt{neutral} accounts for
+$48.1\%$ of the test utterances, so accuracy is dominated by a class on which all systems
+already score around $0.78$--$0.80$ F1, and every architectural improvement reported here is
+bought from the rare classes. The ensemble is the one exception, improving accuracy and
+macro-F1 together, which is again what variance reduction predicts and what shifting the
+decision boundary towards rare classes does not.
+
+\section{Error Analysis}
+\begin{table*}[t]
+\centering
+\caption{Representative contrastive predictions on the MELD test split. \emph{Context} is the preceding turn; \emph{Gold} is the MELD annotation. The two prediction columns are the system that gets the turn right and the one that does not.}
+\label{tab:qualitative}
+\small
+\begin{tabular}{p{0.30\textwidth}p{0.34\textwidth}lll}
+\toprule
+Context (previous turn) & Utterance & Gold & Correct & Wrong \\
+\midrule
+\multicolumn{5}{l}{\textit{Context resolves the utterance: $M_4$ correct, $M_2$ wrong}} \\[2pt]
+Ohh! & Monica: What? & neutral & neutral & surprise \\
+It was just so awkward and bumpy. & Ross: Bumpy? & surprise & surprise & neutral \\
+Well Phoebe, we gotta do something! & Rachel: I mean there's no way Joey's gonna make it in time. & fear & fear & sadness \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Transfer supplies a rare label: $M_4$ correct, $M_3$ wrong}} \\[2pt]
+Howard's the & Ross: Yes but too me he's just, man. & neutral & neutral & sadness \\
+Oh my God! I overslept! I was supposed to be on the set a… & Monica: Oh wait, Joey, you can't go like that! You stink! & disgust & disgust & anger \\
+What's fish hooking? & Ross: Huh, what's fish hooking... Thanks man, that would have bee… & neutral & neutral & surprise \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Context misleads: $M_2$ correct, $M_4$ wrong}} \\[2pt]
+\textit{dialogue start} & Mark: Why do all you're coffee mugs have numbers on the bottom? & surprise & surprise & neutral \\
+\textit{dialogue start} & Joey: Push! & joy & joy & anger \\
+\textit{dialogue start} & Joey: Let's get that ball and really move, hey, hey, ho, ho. & joy & joy & neutral \\
+\addlinespace
+\bottomrule
+\end{tabular}
+\end{table*}
+
+
+Table~\ref{tab:qualitative} collects representative turns where two systems disagree and
+one of them is right. All examples below are drawn from \path{docs/tables/error_analysis.json}, which is
+generated from the saved test predictions.
+
+\paragraph{Where context changes the interpretation.}
+The easiest cases to see are short utterances whose emotion depends entirely on the
+previous turn. In dialogue 4, the utterance \emph{``What?''} follows \emph{``Ohh!''} and is labelled
+\texttt{neutral}; the context-free $M_2$ predicts \texttt{surprise} from the question form
+alone, while $M_4$ reads the exclamation as already carrying the surprise and predicts
+\texttt{neutral}. The reverse pattern also occurs: \emph{``Bumpy?''}, following
+\emph{``It was just so awkward and bumpy''}, is labelled \texttt{surprise}; $M_4$ gets it
+and $M_2$ does not. Some cases need more than one turn. \emph{``I mean there's no way
+Joey's gonna make it in time''} is labelled \texttt{fear}. Without context it is predicted
+as \texttt{sadness}; with the earlier \emph{``we gotta do something!''} it is predicted
+correctly.
+
+\paragraph{Where context hurts.}
+Every case in which the context-free system wins and the sequential system loses occurs at a
+\emph{dialogue-initial} turn, where the UTE has no previous utterance to condition on. The
+repeated exclamation \emph{``Push!''} (labelled \texttt{joy}) is predicted correctly by
+$M_2$ and as \texttt{anger} by $M_4$: with an empty left context the sequence model appears
+to fall back on how intense the words are. So the UTE does use the context it is given:
+when there is none, it does worse than a model that never expected any.
+
+\paragraph{Where fine-grained transfer helps.}
+Transfer resolves cases that require distinguishing between negative emotions of similar
+valence. \emph{``Oh wait, Joey, you can't go like that! You stink!''} is labelled
+\texttt{disgust} and predicted as \texttt{anger} by $M_3$ but correctly by $M_4$. The
+GoEmotions taxonomy contains \texttt{disgust}, \texttt{annoyance} and \texttt{anger} as
+separate categories, so the transferred encoder was trained on this distinction. MELD
+alone has too few examples to teach it.
+
+\paragraph{Dominant confusions.}
+Across all systems the largest off-diagonal cells involve \texttt{neutral}:
+\texttt{neutral} $\rightarrow$ \texttt{joy} ($84$--$98$ utterances depending on the system),
+\texttt{joy} $\rightarrow$ \texttt{neutral} ($\approx 76$) and
+\texttt{sadness} $\rightarrow$ \texttt{neutral} ($\approx 71$--$79$). The
+\texttt{neutral}/\texttt{joy} boundary is the single hardest distinction in the corpus,
+which is unsurprising for a situation comedy in which conversational filler is delivered
+cheerfully. The sequential systems make \emph{more} \texttt{neutral} $\rightarrow$
+\texttt{joy} errors than the others, and that is where their accuracy loss comes from.
+
+\paragraph{The remaining failure mode.}
+Even the best system reaches only $0.26$ F1 on \texttt{fear} and $0.28$ on
+\texttt{disgust}. With $50$ and $68$ test utterances respectively, these classes are both
+hard to learn and noisy to measure. A handful of predictions moves their F1 by several
+points, which is also why they account for most of the seed variance in Table~\ref{tab:main}.
+
+\section{Conclusion}
+
+\paragraph{Implemented work.}
+A complete two-stage pipeline: Stage-I fine-tuning of RoBERTa-base on 27 fine-grained
+GoEmotions categories with the classification head discarded afterwards; Stage-II transfer
+of the backbone to MELD with turn-level positional embeddings, an utterance-level
+Transformer encoder and a new 7-class head, with all three components trainable; the four
+required systems $M_1$--$M_4$ and the fine-grained-distribution extension; and an evaluation
+harness producing accuracy, macro-F1, weighted-F1, per-class scores, confusion matrices and
+contrastive error analysis. Dialogue boundaries and utterance order are preserved
+throughout, and the test set is used once per system. A post-hoc stage averages run
+probabilities into ensembles and fits per-class decision offsets, both selected on dev.
+
+\paragraph{Experimental findings.}
+Fine-grained transfer and sequential context both improve coarse-grained emotion
+recognition on MELD, and they combine: $+1.85$ and $+1.15$ macro-F1 points individually,
+$+2.49$ together, each positive in all three seeds. The answer to the research question is
+yes: fine-grained emotion learning still helps after dialogue context is modelled
+($M_3 \rightarrow M_4$, $+1.34$). The gains are concentrated in the
+rare \texttt{disgust} and \texttt{fear} categories and are paid for by a small loss on
+\texttt{neutral}, so accuracy does not improve even though macro-F1 does. Making the
+fine-grained predictions explicit in the sequence input does not help further as an input,
+and the largest effect in the study is not architectural at all: averaging probabilities
+over seventeen runs reaches $0.4952$ macro-F1, $2.2$ points above a single $M_4$ run, while
+also lifting accuracy to $0.6586$. Two further additions do not help and are reported as
+negative results: speaker embeddings ($-0.50$ test macro-F1 over seven paired seeds), and
+per-class decision offsets, which raise dev macro-F1 in all ten configurations and lower
+test macro-F1 in nine.
+
+\paragraph{Limitations.}
+The study is text-only, while MELD also provides audio and video. Dialogues longer than
+$T_{\max} = 24$ turns are split into windows, so context does not cross a window boundary.
+Three seeds establish the direction of each effect but do not constitute a significance
+test, and we do not claim one. The ensemble result is reported alongside single systems but
+is not a like-for-like comparison: it uses six trained models where each row of
+Table~\ref{tab:main} uses one, so it speaks to what the approach can reach, not to parameter
+efficiency. Checkpoints are selected on dev macro-F1. A sweep of 15
+training variants for $M_4$ (seed 42; loss, epochs, learning rates, UTE depth, speaker
+conditioning) found nothing clearly better on dev than the default recipe, but the other
+systems were not tuned separately. Finally, MELD is drawn from a single television series, which limits how far the
+conclusions generalise to other conversational domains.
+
+\paragraph{Future work.}
+The ensemble result is the clearest lead. If averaging six runs buys more than any
+architectural change we made, the single-model systems are variance-limited, and the useful
+next step is whatever reduces that variance at training time --- longer schedules with
+averaged weights, or distilling the ensemble back into one model --- rather than another
+architectural factor. The gains are also minority-class gains, so reweighting the loss
+looked like an easy next step. It did not help. In our $M_4$ sweep, focal loss matched or lowered dev macro-F1, and
+class weighting lowered it while cutting test accuracy by 5--9 points. The extension result suggests the
+fine-grained signal might do better as a training objective, for example multi-task
+training on both label sets, than as an extra input. The dialogue-initial failures point
+to giving the encoder some context of its own, such as the previous utterances in its
+input; for $M_3$/$M_4$ this would be an extension, since the spec keeps $M_1$/$M_2$
+context-free.
+
+\balance
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{report}
+
+\end{document}
