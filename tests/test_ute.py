@@ -35,3 +35,13 @@ def test_position_embeddings_make_order_matter():
         forward = ute(hidden, mask)
         reversed_ = ute(hidden.flip(1), mask)
     assert not torch.allclose(forward.flip(1), reversed_, atol=1e-4)
+
+
+def test_speaker_embedding_is_initialised_like_the_positional_one():
+    """Both are added straight onto RoBERTa hidden states, so they must start at the same
+    scale. nn.Embedding defaults to N(0, 1), which is ~50x the positional std of 0.02 and
+    swamps the representation at initialisation."""
+    encoder = UtteranceLevelTransformerEncoder(d_model=64, num_speakers=9)
+    assert encoder.speaker is not None
+    assert encoder.speaker.weight.std().item() < 0.05
+    assert abs(encoder.speaker.weight.std().item() - encoder.position.weight.std().item()) < 0.02

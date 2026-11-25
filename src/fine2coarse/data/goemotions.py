@@ -67,7 +67,8 @@ def load_goemotions(
     """Load the `go_emotions` simplified config and reduce it to 27 classes."""
     from datasets import load_dataset
 
-    raw = load_dataset("go_emotions", "simplified", cache_dir=cache_dir)
+    # Namespaced id: newer huggingface_hub rejects the bare legacy name "go_emotions".
+    raw = load_dataset("google-research-datasets/go_emotions", "simplified", cache_dir=cache_dir)
     splits: dict[str, list[TextExample]] = {}
     for split in ("train", "validation", "test"):
         examples: list[TextExample] = []

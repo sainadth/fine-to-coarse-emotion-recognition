@@ -43,6 +43,10 @@ class UtteranceLevelTransformerEncoder(nn.Module):
         self.encoder = nn.TransformerEncoder(layer, num_layers=num_layers, enable_nested_tensor=False)
         self.max_turns = max_turns
         nn.init.normal_(self.position.weight, std=0.02)
+        if self.speaker is not None:
+            # Same scale as the positional embedding: both are added straight onto the
+            # RoBERTa hidden states, and nn.Embedding's N(0, 1) default would swamp them.
+            nn.init.normal_(self.speaker.weight, std=0.02)
 
     def forward(
         self,
