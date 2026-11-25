@@ -139,13 +139,27 @@ it an obvious candidate for transfer to a coarse task. The macro-F1 figures in t
 GoEmotions paper are for the multi-label 28-class task, so they are not comparable to the single-label 27-class setting used
 here.
 
+\paragraph{Intermediate-task transfer.}
+Fine-tuning a pretrained encoder on a labelled intermediate task before the target task
+can improve the target result and make fine-tuning more stable \citep{phang2018stilts}. A
+later large-scale study found that the benefit is not uniform and depends on how the
+intermediate and target tasks are paired \citep{pruksachatkun2020intermediate}. Our Stage~I
+is an instance of this recipe in which the intermediate task is a finer-grained version of
+the target task, drawn from a different domain.
+
 \paragraph{Emotion recognition in conversation.}
 MELD \citep{poria2019meld} provides multi-party dialogues from a television series with
 seven coarse emotion labels per utterance, and is strongly imbalanced towards
 \texttt{neutral}. Most work on this corpus models the conversation in some form, for
-example with recurrent networks over turns or with graph networks over speakers and turns
-\citep{ghosal2019dialoguegcn}. We use the
-simplest context model that fits the project specification: a standard Transformer encoder
+example with recurrent networks that track speaker states across turns
+\citep{majumder2018dialoguernn}, with graph networks over speakers and turns
+\citep{ghosal2019dialoguegcn}, or by adding external commonsense knowledge
+\citep{ghosal2020cosmic}. Two lines of work are closest to ours. HiTrans
+\citep{li2020hitrans} stacks a Transformer over utterance representations from a pretrained
+encoder, the same hierarchy as our Stage~II. EmoBERTa \citep{kim2021emoberta} instead keeps
+a single RoBERTa and puts the speaker names and the surrounding utterances into its input;
+our speaker-prefix recipe is a reduced form of that idea. We use the simplest context model
+that fits the project specification: a standard Transformer encoder
 \citep{vaswani2017attention} applied at the utterance level, with learned turn-level
 positional embeddings.
 
@@ -260,7 +274,9 @@ M_4 &: \mathrm{RoBERTa}_G + \mathrm{UTE} \rightarrow \mathrm{MELD}.
 \input{tables/sweep.tex}
 
 \subsection{Hyperparameters and protocol}
-All systems use AdamW with linear warmup and decay, gradient clipping at 1.0, dropout 0.1,
+The implementation uses PyTorch \citep{paszke2019pytorch} and the Transformers library
+\citep{wolf2020transformers}, from which the pretrained \texttt{roberta-base} weights are
+loaded. All systems use AdamW with linear warmup and decay, gradient clipping at 1.0, dropout 0.1,
 and weight decay 0.01. Stage~I trains for 4 epochs at learning rate $2\times10^{-5}$ with
 batch size 32. Stage~II uses a lower rate for the pretrained backbone
 ($1\times10^{-5}$) than for the newly initialised UTE and classifier
@@ -359,7 +375,8 @@ the frequent classes. Our reading is that the useful part of Stage~I is the
 The differences in Table~\ref{tab:main} are of the same order as the seed spread, which
 suggests that part of what separates the systems is variance rather than signal. We test
 this directly by averaging the predicted class probabilities of runs that differ only in
-seed, and of runs that differ in system. Candidate ensembles are scored on dev and the
+seed, and of runs that differ in system, in the manner of deep ensembles
+\citep{lakshminarayanan2016ensembles}. Candidate ensembles are scored on dev and the
 winner is evaluated on test exactly once, the same protocol used everywhere else in this
 work; Table~\ref{tab:ensemble} lists every candidate.
 
@@ -399,7 +416,8 @@ speaker identity, encoded like this, does not help on MELD.
 
 \paragraph{A negative result: per-class decision offsets.}
 We also fitted one additive offset per class on dev by coordinate ascent on dev macro-F1,
-a standard remedy for a skewed label prior. It does not transfer. Across the ten
+a fitted variant of the logit adjustment used for long-tailed label distributions
+\citep{menon2020logit}. It does not transfer. Across the ten
 system-by-input-variant combinations the offsets raise dev macro-F1 in every case and lower
 \emph{test} macro-F1 in nine, by as much as $1.36$ points. With seven free parameters fitted
 on $1{,}109$ dev utterances, of which $25$ are \texttt{fear}, the offsets are fitting the dev
@@ -450,6 +468,19 @@ valence. \emph{``Oh wait, Joey, you can't go like that! You stink!''} is labelle
 GoEmotions taxonomy contains \texttt{disgust}, \texttt{annoyance} and \texttt{anger} as
 separate categories, so the transferred encoder was trained on this distinction. MELD
 alone has too few examples to teach it.
+
+\paragraph{Ambiguous utterances.}
+Part of the error is in the labels, not the models. Many short turns carry no emotion in
+their words alone, and MELD's gold labels reflect that. Of the $63$ utterance strings that
+occur at least five times in the train and test splits, $45$ ($71\%$) are annotated with
+two or more different emotions and $25$ with three or more. The string ``What?'' is labelled
+\texttt{surprise} $46$ times, \texttt{neutral} $29$ times, and \texttt{sadness},
+\texttt{fear} or \texttt{joy} $4$ times; ``No!'' receives six different labels. No
+classifier that reads the utterance alone can be right on all of these, which is the
+strongest argument in the data for modelling context, and it bounds what $M_1$ and $M_2$
+can reach. Length is not the difficulty: $M_4$ is more accurate on turns of one to three
+words ($72.2\%$) than on turns of nine or more ($57.8\%$), because the frequent short
+turns have a dominant reading that the model learns, while long turns mix several cues.
 
 \paragraph{Dominant confusions.}
 Across all systems the largest off-diagonal cells involve \texttt{neutral}:
