@@ -52,7 +52,8 @@ A free Colab T4 runs the whole pipeline; see [`notebooks/colab_runner.ipynb`](no
 ## 3. Setup
 
 ```bash
-git clone <this repo> && cd fine-to-coarse-emotion-recognition
+git clone https://github.com/sainadth/fine-to-coarse-emotion-recognition.git
+cd fine-to-coarse-emotion-recognition
 python -m venv .venv && source .venv/bin/activate     # or: uv venv .venv
 pip install -r requirements.txt
 pip install -e .
@@ -234,12 +235,25 @@ config matches the system it claims to be.
 ## 9. Repository layout
 
 ```
-configs/                 one YAML per system (M1-M4, extension, smoke)
-data/                    downloaded datasets (git-ignored)
-docs/                    project spec, report source, generated tables
+configs/                 one YAML per system (M1-M4, extension, smoke) and Stage I
+data/                    downloaded datasets (git-ignored; created by prepare_data.py)
+docs/
+  report.pdf             the report; report.tex and report.bib are its source
+  report_inline.tex      the same source with every table inlined (generated)
+  slides.html            the presentation; open in a browser
+  tables/                generated tables the report includes
+  project-spec.pdf       the assignment
+kaggle/                  notebooks that run the pipeline and the recipe sweep on Kaggle GPUs
 notebooks/               Colab runner
-results/                 metrics + predictions per run (git-ignored)
-scripts/                 prepare_data, train_stage1, train_stage2, tables, error analysis
+results/                 metrics, predictions and probabilities of the 52 runs behind the
+                         report (v2_*, v2sp_*, v3spk_*); other runs stay local
+archive/                 frozen snapshots of the first two result sets and their report
+scripts/
+  run_all.sh             train every run, then build the tables
+  build_tables.sh        rebuild every table from results/
+  prepare_data.py, train_stage1.py, train_stage2.py
+  build_results_table.py, ensemble.py, calibrate.py, error_analysis.py, inline_report.py
+  kaggle_run.py          push, submit and pull Kaggle runs
 src/fine2coarse/
   config.py              label vocabularies, paths, YAML helpers
   data/goemotions.py     Stage-I dataset (27 classes, neutral excluded)
@@ -249,6 +263,7 @@ src/fine2coarse/
   models/stage2.py       RoBERTa_G + UTE + 7-class head (all four systems)
   engine.py              training / evaluation loops
   metrics.py             accuracy, macro-F1, weighted-F1, per-class, confusion matrix
+  calibration.py         probability averaging, dev-selected ensembles, decision offsets
 tests/
 ```
 
