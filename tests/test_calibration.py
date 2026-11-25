@@ -1,6 +1,12 @@
 import numpy as np
 
-from fine2coarse.calibration import apply_offsets, average_probabilities, fit_offsets
+from fine2coarse.calibration import (
+    apply_offsets,
+    average_probabilities,
+    fit_offsets,
+    pooled_predictions,
+    select_by_dev,
+)
 from fine2coarse.metrics import compute_metrics
 
 
@@ -47,3 +53,37 @@ def test_average_probabilities_requires_matching_labels():
     except ValueError:
         return
     raise AssertionError("expected ValueError for mismatched y_true")
+
+
+def _runs(probs_per_run, y_true):
+    return [{"y_true": list(y_true), "probs": p} for p in probs_per_run]
+
+
+def test_pooled_predictions_is_argmax_of_the_mean():
+    y_true = [0, 1]
+    runs = _runs([[[0.9, 0.1], [0.4, 0.6]], [[0.3, 0.7], [0.2, 0.8]]], y_true)
+    pooled_y, pooled_pred = pooled_predictions(runs)
+    assert pooled_y.tolist() == y_true
+    assert pooled_pred.tolist() == [0, 1]  # means are [0.6,0.4] and [0.3,0.7]
+
+
+def test_select_by_dev_picks_the_highest_scoring_candidate():
+    y_true, probabilities = _skewed()
+    good = _runs([probabilities.tolist()], y_true)
+    # a candidate that predicts class 0 for everything scores far worse
+    flat = np.zeros_like(probabilities)
+    flat[:, 0] = 1.0
+    bad = _runs([flat.tolist()], y_true)
+    best, scores = select_by_dev({"good": good, "bad": bad}, num_labels=3)
+    assert best == "good"
+    assert scores["good"] > scores["bad"]
+
+
+def test_select_by_dev_breaks_ties_towards_fewer_runs():
+    y_true = [0, 1, 0, 1]
+    probs = [[0.9, 0.1], [0.1, 0.9], [0.8, 0.2], [0.2, 0.8]]
+    small = _runs([probs], y_true)
+    large = _runs([probs, probs, probs], y_true)
+    best, scores = select_by_dev({"large": large, "small": small}, num_labels=2)
+    assert scores["large"] == scores["small"]
+    assert best == "small"

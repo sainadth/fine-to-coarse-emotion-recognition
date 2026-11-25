@@ -71,3 +71,29 @@ def average_probabilities(runs: Sequence[dict]) -> tuple[np.ndarray, np.ndarray]
         if not np.array_equal(np.asarray(run["y_true"]), y_true):
             raise ValueError("runs disagree on y_true; they did not predict the same split in the same order")
     return y_true, np.mean([np.asarray(run["probs"]) for run in runs], axis=0)
+
+
+def pooled_predictions(runs: Sequence[dict]) -> tuple[np.ndarray, np.ndarray]:
+    """y_true and the argmax of the mean probabilities over `runs`."""
+    y_true, mean = average_probabilities(runs)
+    return y_true, mean.argmax(axis=1)
+
+
+def select_by_dev(
+    candidates: "dict[str, Sequence[dict]]",
+    num_labels: int,
+) -> tuple[str, dict[str, float]]:
+    """Pick the ensemble with the best dev macro-F1 and return its name with every score.
+
+    Ties go to the candidate built from fewer runs, so a larger ensemble never
+    displaces a smaller one it merely matches. Candidates are scored on dev only;
+    the caller is responsible for evaluating the winner on test exactly once.
+    """
+    if not candidates:
+        raise ValueError("no candidate ensembles")
+    scores = {}
+    for name, runs in candidates.items():
+        y_true, y_pred = pooled_predictions(runs)
+        scores[name] = _macro_f1(y_true, y_pred, num_labels)
+    best = min(candidates, key=lambda name: (-scores[name], len(candidates[name]), name))
+    return best, scores

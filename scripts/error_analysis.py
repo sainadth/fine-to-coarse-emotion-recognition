@@ -151,6 +151,68 @@ def contrastive(aligned: dict[str, list[dict]], winner: str, loser: str, limit: 
     return examples
 
 
+
+def _tex_escape(text: str) -> str:
+    for a, b in (("\\", r"\textbackslash{}"), ("&", r"\&"), ("%", r"\%"), ("$", r"\$"),
+                 ("#", r"\#"), ("_", r"\_"), ("{", r"\{"), ("}", r"\}"), ("~", r"\textasciitilde{}"),
+                 ("^", r"\textasciicircum{}")):
+        text = text.replace(a, b)
+    return text
+
+
+def _clip(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "\u2026"
+
+
+def qualitative_latex(examples: dict, per_group: int = 3) -> str:
+    """Contrastive cases as a table: last context turn, utterance, gold, both predictions.
+
+    The spec asks for representative predictions in the error analysis; prose alone makes
+    the reader reconstruct the contrast. Each group gets its own heading row so the table
+    reads as three separate claims, and an example already shown is not repeated.
+    """
+    groups = [
+        ("context_helps_M4_over_M2", r"Context resolves the utterance: $M_4$ correct, $M_2$ wrong", "M4_pred", "M2_pred"),
+        ("transfer_helps_M4_over_M3", r"Transfer supplies a rare label: $M_4$ correct, $M_3$ wrong", "M4_pred", "M3_pred"),
+        ("context_hurts_M2_over_M4", r"Context misleads: $M_2$ correct, $M_4$ wrong", "M2_pred", "M4_pred"),
+    ]
+    lines = [
+        r"\begin{table*}[t]", r"\centering",
+        r"\caption{Representative contrastive predictions on the MELD test split. "
+        r"\emph{Context} is the preceding turn; \emph{Gold} is the MELD annotation. "
+        r"The two prediction columns are the system that gets the turn right and the one that does not.}",
+        r"\label{tab:qualitative}", r"\small",
+        r"\begin{tabular}{p{0.30\textwidth}p{0.34\textwidth}lll}", r"\toprule",
+        r"Context (previous turn) & Utterance & Gold & Correct & Wrong \\",
+        r"\midrule",
+    ]
+    seen: set[tuple] = set()
+    for key, title, right, wrong in groups:
+        rows = []
+        for row in examples.get(key, []):
+            ident = (row["dialogue_id"], row["turn"])
+            if ident in seen:
+                continue
+            seen.add(ident)
+            rows.append(row)
+            if len(rows) == per_group:
+                break
+        if not rows:
+            continue
+        lines.append(rf"\multicolumn{{5}}{{l}}{{\textit{{{title}}}}} \\[2pt]")
+        for row in rows:
+            context = (_tex_escape(_clip(row["context"][-1], 58)) if row.get("context")
+                       else r"\textit{dialogue start}")
+            utterance = _tex_escape(_clip(f'{row["speaker"]}: {row["utterance"]}', 66))
+            lines.append(
+                f"{context} & {utterance} & {row['gold']} & {row[right]} & {row[wrong]} \\\\"
+            )
+        lines.append(r"\addlinespace")
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}"]
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", default=str(RESULTS_DIR))
@@ -193,7 +255,9 @@ def main() -> None:
         },
     }
     write_json(args.out, report)
-    LOGGER.info("wrote %s", args.out)
+    tex_path = Path(args.out).parent / "qualitative.tex"
+    tex_path.write_text(qualitative_latex(report["examples"]), encoding="utf-8")
+    LOGGER.info("wrote %s and %s", args.out, tex_path)
 
     for name, delta in report["deltas"].items():
         if not delta:
