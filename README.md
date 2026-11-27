@@ -240,6 +240,7 @@ docs/
   report.pdf             the report; report.tex and report.bib are its source
   report_inline.tex      the same source with every table inlined (generated)
   slides.html            the presentation; open in a browser
+  slides.pptx            the same presentation as PowerPoint, one slide per click step
   tables/                generated tables the report includes
 kaggle/                  notebooks that run the pipeline and the recipe sweep on Kaggle GPUs
 notebooks/               Colab runner

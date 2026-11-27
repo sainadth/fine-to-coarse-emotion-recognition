@@ -181,6 +181,7 @@ aside { display: none; }
 #notes { position: fixed; left: 0; right: 0; bottom: 0; background: var(--ink); color: #fff; padding: 18px 28px 22px; font-size: 18px; line-height: 1.45; display: none; }
 #notes.show { display: block; }
 .still * { transition: none !important; }
+.export #hint, .export #bar { display: none; }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: .01s !important; transition-delay: 0s !important; } }
 </style>
 </head>
@@ -395,6 +396,7 @@ aside { display: none; }
 const slides = [...document.querySelectorAll('.slide')];
 const still = new URLSearchParams(location.search).has('still');
 if (still) document.body.classList.add('still');
+if (new URLSearchParams(location.search).has('export')) document.body.classList.add('export');  // frames for slides.pptx
 let i = 0, s = 0;
 
 // 2,610 dots in the order of the class counts, so the grid reads as a proportion.
