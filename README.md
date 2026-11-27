@@ -46,7 +46,9 @@ M₃ vs M₄ asks whether transfer still helps once context is modelled.
 * PyTorch 2.1+ (CUDA, Apple MPS, or CPU; the device is picked automatically)
 * ~4 GB GPU memory for the dialogue-level systems at the default settings
 
-A free Colab T4 runs the whole pipeline; see [`notebooks/colab_runner.ipynb`](notebooks/colab_runner.ipynb).
+[`notebooks/colab_runner.ipynb`](notebooks/colab_runner.ipynb) walks through one seed of
+Stage I and M₁–M₄ on a free Colab T4, about 2 to 3 hours. The full set of runs behind the
+report is section 5.
 
 ## 3. Setup
 
@@ -124,7 +126,7 @@ One-time setup: grab an API token at <https://www.kaggle.com/settings> > API >
 `.env` at the repository root (`.env` is git-ignored):
 
 ```bash
-cp .env.example .env    # then fill in KAGGLE_USERNAME and KAGGLE_KEY
+cp .env.example .env    # then fill in KAGGLE_USERNAME and KAGGLE_API_TOKEN (or KAGGLE_KEY)
 pip install kaggle
 ```
 
@@ -141,14 +143,14 @@ python scripts/kaggle_run.py pull              # copy metrics + tables back into
 ```
 
 Free tier: 30 GPU-hours per week, 12 hours per session -- enough for every run in section 5
-in one kernel. `kaggle/run_pipeline.ipynb` lists the seeds and runs it trains; set
-`KEEP_CHECKPOINTS` there to keep the Stage-I backbone in the kernel output.
+in one kernel. `kaggle/run_pipeline.ipynb` calls `scripts/run_all.sh`, so Kaggle and a local
+run train exactly the same things.
 
 ## 6. Tables and report
 
 ```bash
 bash scripts/build_tables.sh            # every table in the report, from results/
-cd docs && tectonic report.tex          # report.pdf
+(cd docs && tectonic report.tex)        # report.pdf; needs the tectonic LaTeX engine
 python scripts/inline_report.py         # docs/report_inline.tex, one self-contained source file
 ```
 
@@ -174,6 +176,9 @@ compare with the committed ones:
 bash scripts/build_tables.sh
 git diff --stat docs/tables        # prints nothing: every table is reproduced byte for byte
 ```
+
+`git diff` needs a git clone. In a copy unpacked from a zip the command still rebuilds the
+tables in place; the files it writes are the same ones that were shipped.
 
 **What to expect.** Main table: M₁ 45.16, M₂ 47.01, M₃ 46.31, M₄ 47.65 test macro-F1 (three
 seeds). Single M₄ run over seven seeds: 47.30 ± 0.94. Dev-selected ensemble (M₂ + M₄ +
@@ -210,14 +215,15 @@ prior. The report presents it as a negative result and uses ensembling instead.
 
 | Artifact | Path |
 |---|---|
-| Stage-I backbone (`θ_G`) + discarded head | `checkpoints/stage1_goemotions/{backbone,fine_head.pt}` |
-| Stage-II checkpoints | `checkpoints/<run_name>/model.pt` |
+| Stage-I backbone (`θ_G`) + discarded head | `checkpoints/<stage1 run>/{backbone,fine_head.pt}`, kept only with `KEEP_CHECKPOINTS=1` |
+| Stage-II checkpoints | `checkpoints/<run_name>/model.pt`, kept only with `KEEP_CHECKPOINTS=1` |
 | Per-run metrics and history | `results/<run_name>/metrics.json` |
 | Per-run dev/test predictions and probabilities | `results/<run_name>/{dev,test}_predictions.json` |
-| Comparison tables | `docs/tables/table1.md`, `docs/tables/table1.tex` |
+| Comparison and per-class tables | `docs/tables/table1.{md,tex}`, `docs/tables/per_class.tex` |
 | Ensemble table and dev selection | `docs/tables/ensemble.{md,tex}`, `results/ensemble_selection.json` |
 | Decision-offset results | `results/v2_calibration.json`, `results/v2sp_calibration.json` |
-| Error analysis | `docs/tables/error_analysis.json` |
+| Error analysis and contrastive examples | `docs/tables/error_analysis.json`, `docs/tables/qualitative.tex` |
+| Slides | `docs/slides.pptx`, `docs/slides.html` |
 | Report source | `docs/report.tex`, `docs/report.bib` |
 | Report PDF | `docs/report.pdf` (build: `cd docs && tectonic report.tex`) |
 
@@ -228,8 +234,9 @@ pytest -q
 ```
 
 Covers the GoEmotions label remapping, MELD dialogue grouping / windowing / collation,
-UTE padding invariance and order sensitivity, the metric block, and the fact that every
-config matches the system it claims to be.
+UTE padding invariance and order sensitivity, the loss options, the metric block,
+ensemble selection and decision offsets, the contrastive-examples table, safe Kaggle pulls,
+and the fact that every config matches the system it claims to be.
 
 ## 9. Repository layout
 
