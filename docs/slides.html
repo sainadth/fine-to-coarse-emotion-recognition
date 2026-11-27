@@ -173,7 +173,9 @@ aside { display: none; }
 /* 12 questions */
 .qa { position: absolute; left: 96px; top: 190px; font-size: 180px; font-weight: 800; letter-spacing: -6px; padding: 44px 84px 52px; border-radius: 96px 96px 96px 18px; background: var(--ink); color: #fff; box-shadow: none; transform: scale(.6); transform-origin: left bottom; opacity: 0; transition: transform .8s var(--ease), opacity .4s; }
 .active .qa { transform: none; opacity: 1; }
-.thanks { position: absolute; left: 96px; top: 560px; }
+.thanks { position: absolute; left: 96px; top: 540px; }
+.repo { position: absolute; left: 96px; top: 612px; }
+.repo a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--sadness); text-decoration-thickness: 4px; text-underline-offset: 8px; }
 
 /* chrome */
 #bar { position: fixed; left: 0; bottom: 0; height: 5px; background: var(--ink); transition: width .4s var(--ease); }
@@ -379,7 +381,8 @@ aside { display: none; }
 
 <section class="slide" id="s-questions" aria-label="Questions">
   <div class="bubble qa">Questions?</div>
-  <p class="big thanks">Thank you. <span class="muted">Code, runs and report reproduce with one command each.</span></p>
+  <p class="big thanks">Thank you. <span class="muted">Code, runs and report:</span></p>
+  <p class="big repo"><a href="https://github.com/sainadth/fine-to-coarse-emotion-recognition">github.com/sainadth/fine-to-coarse-emotion-recognition</a></p>
   <div class="spectrum" aria-hidden="true">
     <i style="--c:var(--neutral);--n:0;flex:1256"></i><i style="--c:var(--joy);--n:1;flex:402"></i><i style="--c:var(--anger);--n:2;flex:345"></i><i style="--c:var(--surprise);--n:3;flex:281"></i><i style="--c:var(--sadness);--n:4;flex:208"></i><i style="--c:var(--disgust);--n:5;flex:68"></i><i style="--c:var(--fear);--n:6;flex:50"></i>
   </div>
@@ -448,7 +451,7 @@ addEventListener('keydown', e => {
   else if (e.key.toLowerCase() === 'n') document.getElementById('notes').classList.toggle('show');
   else if (e.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
 });
-addEventListener('click', e => (e.clientX < innerWidth * 0.25 ? prev() : next()));
+addEventListener('click', e => { if (e.target.closest('a')) return; e.clientX < innerWidth * 0.25 ? prev() : next(); });
 let touch = null;
 addEventListener('touchstart', e => (touch = e.touches[0].clientX), { passive: true });
 addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - touch; if (Math.abs(dx) > 40) (dx < 0 ? next() : prev()); });
