@@ -146,12 +146,10 @@ Free tier: 30 GPU-hours per week, 12 hours per session -- enough for every run i
 in one kernel. `kaggle/run_pipeline.ipynb` calls `scripts/run_all.sh`, so Kaggle and a local
 run train exactly the same things.
 
-## 6. Tables and report
+## 6. Tables
 
 ```bash
 bash scripts/build_tables.sh            # every table in the report, from results/
-(cd docs && tectonic report.tex)        # report.pdf; needs the tectonic LaTeX engine
-python scripts/inline_report.py         # docs/report_inline.tex, one self-contained source file
 ```
 
 `build_tables.sh` needs no GPU and takes about a minute. It runs:
@@ -225,7 +223,7 @@ prior. The report presents it as a negative result and uses ensembling instead.
 | Error analysis and contrastive examples | `docs/tables/error_analysis.json`, `docs/tables/qualitative.tex` |
 | Slides | `docs/slides.pptx`, `docs/slides.html` |
 | Report source | `docs/report.tex`, `docs/report.bib` |
-| Report PDF | `docs/report.pdf` (build: `cd docs && tectonic report.tex`) |
+| Report PDF | `docs/report.pdf` |
 
 ## 8. Tests
 
